@@ -1,0 +1,238 @@
+/******************************************************************************
+
+    tiny.lst
+
+    List of all enabled drivers in the system. This file is parsed by
+    makelist.exe, sorted, and output as C code describing the drivers.
+
+****************************************************************************
+
+    Copyright Aaron Giles
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+        * Redistributions of source code must retain the above copyright
+          notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright
+          notice, this list of conditions and the following disclaimer in
+          the documentation and/or other materials provided with the
+          distribution.
+        * Neither the name 'MAME' nor the names of its contributors may be
+          used to endorse or promote products derived from this software
+          without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY AARON GILES ''AS IS'' AND ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL AARON GILES BE LIABLE FOR ANY DIRECT,
+    INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+    STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+    IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+    POSSIBILITY OF SUCH DAMAGE.
+
+******************************************************************************/
+
+forgottn        //  7/1988 (c) 1988 (World)
+forgottnu       //  7/1988 (c) 1988 (USA)
+forgottnu1      //  7/1988 (c) 1988 (USA)
+forgottnua      //  7/1988 (c) 1988 (USA)
+forgottnuaa     //  7/1988 (c) 1988 (USA)
+lostwrld        //  7/1988 (c) 1988 (Japan)
+lostwrldo       //  7/1988 (c) 1988 (Japan)
+ghouls          // 12/1988 (c) 1988 (World)
+ghoulsu         // 12/1988 (c) 1988 (USA)
+daimakai        // 12/1988 (c) 1988 (Japan)
+daimakair       // 12/1988 (c) 1988 (Japan)
+strider         //  3/1989 (c) 1989 (not explicitly stated but should be USA)
+striderua       //  3/1989 (c) 1989 (not explicitly stated but should be USA)
+striderj        //  3/1989 (c) 1989 (Japan)
+striderjr       //  3/1989 (c) 1989 (Japan)
+dynwar          //  4/1989 (c) 1989 (USA)
+dynwara         //  4/1989 (c) 1989 (USA)
+dynwarj         //  4/1989 (c) 1989 (Japan)
+dynwarjr        //  4/1989 (c) 1989 (Japan)
+willow          //  6/1989 (c) 1989 (World)
+willowu         //  6/1989 (c) 1989 (USA)
+willowuo        //  6/1989 (c) 1989 (USA)
+willowj         //  6/1989 (c) 1989 (Japan)
+unsquad         //  8/1989 (c) 1989 (USA)
+area88          //  8/1989 (c) 1989 (Japan)
+area88r         //  8/1989 (c) 1989 (Japan)
+ffight          // 12/1989 (c) 1989 (World)
+ffighta         // 12/1989 (c) 1989 (World)
+ffightu         // 12/1989 (c) 1989 (USA)
+ffightu1        // 12/1989 (c) 1989 (USA)
+ffightua        // 12/01/1990 (c) 1989 (USA)
+ffightub        // 13/06/1990 (c) 1989 (USA)
+ffightj         // 12/1989 (c) 1989 (Japan)
+ffightj1        // 12/01/1990 (c) 1989 (Japan)
+ffightj2        // 05/03/1990 (c) 1989 (Japan)
+ffightj3        // 13/06/1990 (c) 1989 (Japan)
+ffightjh        // hack
+1941            // 27/02/1990 (c) 1990 (World)
+1941r1          //  2/1990 (c) 1990 (World)
+1941u           // 27/02/1990 (c) 1990 (USA)
+1941j           //  2/1990 (c) 1990 (Japan)
+mercs           // 02/03/1990 (c) 1990 (World)
+mercsu          // 08/06/1990 (c) 1990 (USA)
+mercsur1        // 02/03/1990 (c) 1990 (USA)
+mercsj          // 02/03/1990 (c) 1990 (Japan)
+mtwins          // 19/06/1990 (c) 1990 (World)
+chikij          // 19/06/1990 (c) 1990 (Japan)
+msword          // 25/07/1990 (c) 1990 (World)
+mswordr1        // 23/06/1990 (c) 1990 (World)
+mswordu         // 25/07/1990 (c) 1990 (USA)
+mswordj         // 23/06/1990 (c) 1990 (Japan)
+cawing          // 12/10/1990 (c) 1990 (World)
+cawingr1        // 09/10/1990 (c) 1990 (World)
+cawingu         // 12/10/1990 (c) 1990 (USA)
+cawingj         // 12/10/1990 (c) 1990 (Japan)
+cawingbl        // bootleg
+cawingb2        // bootleg
+nemo            // 30/11/1990 (c) 1990 (World)
+nemor1      // 09/11/1990 (c) 1990 (World)
+nemoj           // 20/11/1990 (c) 1990 (Japan)
+sf2             // 22/05/1991 (c) 1991 (World)
+sf2eb           // 14/02/1991 (c) 1991 (World)
+sf2ed           // 18/03/1991 (c) 1991 (World)
+sf2ee           // 28/02/1991 (c) 1991 (World)
+sf2ebbl         // 14/02/1991 (c) 1991 (World, bootleg)
+sf2ebbl2        // 14/02/1991 (c) 1991 (World, bootleg)
+sf2ebbl3        // 14/02/1991 (c) 1991 (World, bootleg)
+sf2stt          // bootleg
+sf2rk           // bootleg
+sf2ua           // 06/02/1991 (c) 1991 (USA)
+sf2ub           // 14/02/1991 (c) 1991 (USA)
+sf2uc           // 06/03/1991 (c) 1991 (USA)
+sf2ud           // 18/03/1991 (c) 1991 (USA)
+sf2ue           // 28/02/1991 (c) 1991 (USA)
+sf2uf           // 11/04/1991 (c) 1991 (USA)
+sf2ug           // 22/05/1991 (c) 1991 (USA, Rev. G)
+sf2ui           // 22/05/1991 (c) 1991 (USA, Rev. I)
+sf2uk           // 01/11/1991 (c) 1991 (USA)
+sf2j            // 10/12/1991 (c) 1991 (Japan)
+sf2ja           // 14/02/1991 (c) 1991 (Japan)
+sf2jc           // 06/03/1991 (c) 1991 (Japan)
+sf2jf           // 11/04/1991 (c) 1991 (Japan)
+sf2jh           // 22/05/1991 (c) 1991 (Japan)
+sf2jl           // 12/03/1992 (c) 1991 (Japan)
+sf2qp1          // hack
+sf2thndr        // hack
+3wonders        // 20/05/1991 (c) 1991 (World)
+3wondersr1      // 13/05/1991 (c) 1991 (World)
+3wondersu       // 20/05/1991 (c) 1991 (USA)
+wonder3         // 20/05/1991 (c) 1991 (Japan)
+3wondersb       // bootleg
+3wondersh       // hack
+kod             // 05/08/1991 (c) 1991 (World)
+kodr1           // 11/07/1991 (c) 1991 (World)
+kodu            // 10/09/1991 (c) 1991 (USA)
+kodj            // 05/08/1991 (c) 1991 (Japan)
+kodja           // 05/08/1991 (c) 1991 (Japan)
+kodb            // bootleg
+captcomm        // 02/12/1991 (c) 1991 (World)
+captcommr1      // 14/10/1991 (c) 1991 (World)
+captcommu       // 28/09/1991 (c) 1991 (USA)
+captcommj       // 02/12/1991 (c) 1991 (Japan)
+captcommjr1     // 28/09/1991 (c) 1991 (Japan)
+captcommb       // bootleg
+knights         // 27/11/1991 (c) 1991 (World)
+knightsu        // 27/11/1991 (c) 1991 (USA)
+knightsj        // 27/11/1991 (c) 1991 (Japan)
+knightsja       // 27/11/1991 (c) 1991 (Japan)
+knightsb        // bootleg
+sf2ce           // 13/05/1992 (c) 1992 (World)
+sf2ceea         // 13/03/1992 (c) 1992 (World)
+sf2ceua         // 13/03/1992 (c) 1992 (USA)
+sf2ceub         // 13/05/1992 (c) 1992 (USA)
+sf2ceuc         // 03/08/1992 (c) 1992 (USA)
+sf2ceja         // 22/03/1992 (c) 1992 (Japan)
+sf2cejb         // 13/05/1992 (c) 1992 (Japan)
+sf2cejc         // 03/08/1992 (c) 1992 (Japan)
+sf2bhh          // hack
+sf2rb           // hack
+sf2rb2          // hack
+sf2rb3          // hack
+sf2red          // hack
+sf2v004         // hack
+sf2acc          // hack
+sf2acca         // hack
+sf2ceblp            // hack
+sf2accp2        // hack
+sf2amf          // bootleg
+sf2amf2         // bootleg
+sf2dkot2        // hack
+sf2m1           // hack
+sf2m2           // hack
+sf2m3           // hack
+sf2m4           // hack
+sf2m5           // hack
+sf2m6           // hack
+sf2m7           // hack
+sf2m8           // bootleg
+sf2m9           // bootleg
+sf2yyc          // hack
+sf2koryu        // hack
+sf2dongb        // hack
+sf2mdt          // bootleg
+sf2mdta         // bootleg
+sf2mdtb         // bootleg
+sf2b            // bootleg
+cworld2j        // 11/06/1992 (c) 1992 (Japan)
+cworld2ja       // 11/06/1992 (c) 1992 (Japan)
+cworld2jb       // 11/06/1992 (c) 1992 (Japan)
+varth           // 14/07/1992 (c) 1992 (World)
+varthr1         // 12/06/1992 (c) 1992 (World)
+varthu          // 12/06/1992 (c) 1992 (USA)
+varthj          // 14/07/1992 (c) 1992 (Japan)
+qad             // 01/07/1992 (c) 1992 (USA)
+qadjr           // 21/09/1994 (c) 1994 (Japan)
+wof             // 31/10/1992 (c) 1992 (World) (CPS1 + QSound)
+wofr1           // 02/10/1992 (c) 1992 (World) (CPS1 + QSound)
+wofu            // 31/10/1992 (c) 1992 (USA) (CPS1 + QSound)
+wofa            // 05/10/1992 (c) 1992 (Asia)  (CPS1 + QSound)
+wofj            // 31/10/1992 (c) 1992 (Japan) (CPS1 + QSound)
+wofhfh          // bootleg
+sgyxz           // bootleg (All-In Electronics)
+sf2hf           // 09/12/1992 (c) 1992 (World)
+sf2hfu          // 09/12/1992 (c) 1992 (USA)
+sf2hfj          // 09/12/1992 (c) 1992 (Japan)
+dino            // 01/02/1993 (c) 1993 (World) (CPS1 + QSound)
+dinou           // 01/02/1993 (c) 1993 (USA) (CPS1 + QSound)
+dinoj           // 01/02/1993 (c) 1993 (Japan) (CPS1 + QSound)
+dinopic         // bootleg
+dinopic2        // bootleg
+dinohunt        // bootleg
+punisher        // 22/04/1993 (c) 1993 (World) (CPS1 + QSound)
+punisheru       // 22/04/1993 (c) 1993 (USA) (CPS1 + QSound)
+punisherh       // 22/04/1993 (c) 1993 (Hispanic) (CPS1 + QSound)
+punisherj       // 22/04/1993 (c) 1993 (Japan) (CPS1 + QSound)
+punipic         // bootleg
+punipic2        // bootleg
+punipic3        // bootleg
+punisherbz      // bootleg
+slammast        // 13/07/1993 (c) 1993 (World) (CPS1 + QSound)
+slammastu       // 13/07/1993 (c) 1993 (USA) (CPS1 + QSound)
+slampic         // bootleg
+mbomberj        // 13/07/1993 (c) 1993 (Japan) (CPS1 + QSound)
+mbombrd         // 06/12/1993 (c) 1993 (World) (CPS1 + QSound)
+mbombrdj        // 06/12/1993 (c) 1993 (Japan) (CPS1 + QSound)
+kenseim         // 18/04/1994 (c) 1994 Togo/Sigma (Japan) not listed on Capcom's site
+pnickj          // 08/06/1994 (c) 1994 Compile + Capcom license (Japan) not listed on Capcom's site
+qtono2j         // 23/01/1995 (c) 1995 (Japan)
+pang3           // 01/06/1995 (c) 1995 Mitchell (Euro) not listed on Capcom's site
+pang3r1         // 11/05/1995 (c) 1995 Mitchell (Euro) not listed on Capcom's site
+pang3j          // 11/05/1995 (c) 1995 Mitchell (Japan) not listed on Capcom's site
+pang3b          // bootleg
+megaman         // 06/10/1995 (c) 1995 (USA)
+megamana        // 06/10/1995 (c) 1995 (Asia)
+rockmanj        // 22/09/1995 (c) 1995 (Japan)
+fcrash          // bootleg of Final Fight
+ffightbl        // bootleg
+ganbare         // 11/04/2000 (c) 2000 (Japan)

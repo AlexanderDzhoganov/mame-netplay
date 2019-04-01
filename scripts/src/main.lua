@@ -145,8 +145,10 @@ end
 		if os.getenv("EMSCRIPTEN") then
 			local emccopts = ""
 				.. " -O" .. _OPTIONS["OPTIMIZE"]
+				.. " -s USE_PTHREADS=0"
 				.. " -s USE_SDL=2"
 				.. " -s USE_SDL_TTF=2"
+				.. " -s USE_ZLIB=1"
 				.. " --memory-init-file 0"
 				.. " -s ALLOW_MEMORY_GROWTH=0"
 				.. " -s TOTAL_MEMORY=268435456"
@@ -157,10 +159,6 @@ end
 				.. " -s ERROR_ON_UNDEFINED_SYMBOLS=0"
 				.. " --pre-js " .. _MAKE.esc(MAME_DIR) .. "src/osd/modules/sound/js_sound.js"
 				.. " --post-js " .. _MAKE.esc(MAME_DIR) .. "scripts/resources/emscripten/emscripten_post.js"
-				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/chains@bgfx/chains"
-				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/effects@bgfx/effects"
-				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/shaders/essl@bgfx/shaders/essl"
-				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "artwork/slot-mask.png@artwork/slot-mask.png"
 
 			if _OPTIONS["SYMBOLS"]~=nil and _OPTIONS["SYMBOLS"]~="0" then
 				emccopts = emccopts
