@@ -246,4 +246,7 @@ class validity_checker;
 // declared in video.h
 class video_manager;
 
+// declared in netplay.h
+class netplay_manager;
+
 #endif // MAME_EMU_EMUFWD_H

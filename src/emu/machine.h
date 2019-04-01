@@ -188,6 +188,7 @@ public:
 	tilemap_manager &tilemap() const { assert(m_tilemap != nullptr); return *m_tilemap; }
 	debug_view_manager &debug_view() const { assert(m_debug_view != nullptr); return *m_debug_view; }
 	debugger_manager &debugger() const { assert(m_debugger != nullptr); return *m_debugger; }
+	netplay_manager &netplay() const { assert(m_netplay != nullptr); return *m_netplay; }
 	driver_device *driver_data() const { return &downcast<driver_device &>(root_device()); }
 	template <class DriverClass> DriverClass *driver_data() const { return &downcast<DriverClass &>(root_device()); }
 	machine_phase phase() const { return m_current_phase; }
@@ -197,6 +198,7 @@ public:
 	const char *basename() const { return m_basename.c_str(); }
 	int sample_rate() const { return m_sample_rate; }
 	bool save_or_load_pending() const { return !m_saveload_pending_file.empty(); }
+	bool netplay_active() const { return m_netplay_active; }
 
 	// RAII-based side effect disable
 	// NOP-ed when passed false, to make it more easily conditional
@@ -332,6 +334,7 @@ private:
 	std::unique_ptr<image_manager> m_image;            // internal data from image.cpp
 	std::unique_ptr<rom_load_manager> m_rom_load;      // internal data from romload.cpp
 	std::unique_ptr<debugger_manager> m_debugger;      // internal data from debugger.cpp
+	std::unique_ptr<netplay_manager> m_netplay;
 
 	// system state
 	machine_phase           m_current_phase;        // current execution phase
@@ -339,6 +342,7 @@ private:
 	bool                    m_hard_reset_pending;   // is a hard reset pending?
 	bool                    m_exit_pending;         // is an exit pending?
 	emu_timer *             m_soft_reset_timer;     // timer used to schedule a soft reset
+	bool                    m_netplay_active;       // is netplay active?
 
 	// misc state
 	u32                     m_rand_seed;            // current random number seed

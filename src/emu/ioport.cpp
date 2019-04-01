@@ -98,6 +98,8 @@
 #include "ui/uimain.h"
 #include "inputdev.h"
 #include "natkeyboard.h"
+#include "netplay_input_state.h"
+#include "netplay_peer.h"
 
 #include "osdepend.h"
 
@@ -2050,15 +2052,68 @@ g_profiler.start(PROFILER_INPUT);
 	for (auto &port : m_portlist)
 		port.second->update_defvalue(false);
 
+	std::unique_ptr<netplay_input_state> net_state;
+	if (machine().netplay_active())
+	{
+		net_state = std::make_unique<netplay_input_state>(machine().netplay().machine_time());
+	}
+
 	// loop over all input ports
 	for (auto &port : m_portlist)
 	{
 		port.second->frame_update();
 
-		// handle playback/record
-		playback_port(*port.second.get());
-		record_port(*port.second.get());
+		if (machine().netplay_active())
+		{
+			auto& net_port = net_state->add_input_port(port.second->live().defvalue, port.second->live().digital);
+			for (auto analog = port.second->live().analoglist.first(); analog != nullptr; analog = analog->next())
+	  	{
+				net_port.add_analog_port(analog->m_accum, analog->m_previous, analog->m_sensitivity, analog->m_reverse);
+			}
 
+			// clear all inputs so immediate local input doesn't affect the emulator state
+			clear_netplay_inputs(*port.second);
+		}
+		else
+		{
+			// handle playback/record
+			playback_port(*port.second.get());
+			record_port(*port.second.get());
+		}
+	}
+
+	if (machine().netplay_active())
+	{
+		auto& netplay = machine().netplay();
+		netplay.add_input_state(std::move(net_state));
+
+		auto& peers = netplay.get_peers();
+		auto machine_time = netplay.machine_time();
+
+		for (auto& peer : peers)
+		{
+			// get all inputs from this peer before the current machine time
+			auto inputs = peer->get_inputs_before(machine_time);
+
+			// merge the inputs with the emulator ones
+			auto port_index = 0u;
+			for (auto &port : m_portlist)
+			{
+				merge_netplay_inputs(*port.second, inputs, port_index);
+				port_index++;
+			}
+			
+			// set all inputs as consumed so we don't replay them
+			for (auto& state : inputs)
+			{
+				state->set_consumed(true);
+			}
+		}
+	}
+
+	// loop over all input ports
+	for (auto &port : m_portlist)
+	{
 		// call device line write handlers
 		ioport_value newvalue = port.second->read();
 		for (dynamic_field &dynfield : port.second->live().writelist)
@@ -2069,6 +2124,51 @@ g_profiler.start(PROFILER_INPUT);
 g_profiler.stop();
 }
 
+void ioport_manager::clear_netplay_inputs(ioport_port& port)
+{
+	// read the default value and the digital state
+  port.live().digital = 0;
+	port.live().defvalue = 0;
+
+  // loop over analog ports and save their data
+  for (analog_field *analog = port.live().analoglist.first(); analog != NULL; analog = analog->next())
+  {
+    // reset current and previous values
+    analog->m_accum = 0;
+    analog->m_previous = 0;
+		analog->m_sensitivity = 0;
+		analog->m_reverse = 0;
+  }
+}
+
+void ioport_manager::merge_netplay_inputs(ioport_port& port, const std::vector<netplay_input_state*>& states, unsigned int port_index)
+{
+	for (auto& state : states)
+	{
+		auto& input_port = state->m_ports[port_index];
+
+		// read the default value and the digital state
+		port.live().defvalue |= input_port.m_defvalue;
+		port.live().digital |= input_port.m_digital;
+
+		// loop over analog ports and save their data
+		auto analog_index = 0u;
+		for (analog_field *analog = port.live().analoglist.first(); analog != NULL; analog = analog->next())
+		{
+			auto& analog_port = input_port.m_analog_ports[analog_index];
+
+			// read current and previous values
+			analog->m_accum |= analog_port.m_accum;
+			analog->m_previous |= analog_port.m_previous;
+
+			// read configuration information
+			analog->m_sensitivity |= analog_port.m_sensitivity;
+			analog->m_reverse |= analog_port.m_reverse;
+
+			analog_index++;
+		}
+  }
+}
 
 //-------------------------------------------------
 //  frame_interpolate - interpolate between two

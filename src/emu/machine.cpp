@@ -82,6 +82,10 @@
 #include "dirtc.h"
 #include "image.h"
 #include "network.h"
+#include "netplay_memory_block.h"
+#include "netplay_socket.h"
+#include "netplay_input_state.h"
+#include "netplay_peer.h"
 #include "romload.h"
 #include "ui/uimain.h"
 #include <time.h>
@@ -118,6 +122,7 @@ running_machine::running_machine(const machine_config &_config, machine_manager 
 		m_hard_reset_pending(false),
 		m_exit_pending(false),
 		m_soft_reset_timer(nullptr),
+		m_netplay_active(false),
 		m_rand_seed(0x9d14abd7),
 		m_ui_active(_config.options().ui_active()),
 		m_basename(_config.gamedrv().name),
@@ -206,6 +211,16 @@ void running_machine::start()
 	// create the video manager
 	m_video = std::make_unique<video_manager>(*this);
 	m_ui = manager().create_ui(*this);
+
+	// initialize netplay
+	m_netplay = std::make_unique<netplay_manager>(*this);
+	if (options().netplay())
+	{
+		if (!m_netplay->initialize())
+			throw emu_fatalerror("netplay failed to initialize");
+
+		m_netplay_active = true;
+	}
 
 	// initialize the base time (needed for doing record/playback)
 	::time(&m_base_time);
@@ -331,6 +346,11 @@ int running_machine::run(bool quiet)
 
 		// perform a soft reset -- this takes us to the running phase
 		soft_reset();
+
+		if (m_netplay_active && netplay().debug())
+		{
+			netplay().print_debug_info();
+		}
 
 		// handle initial load
 		if (m_saveload_schedule != saveload_schedule::NONE)
@@ -1364,6 +1384,8 @@ void running_machine::emscripten_main_loop()
 
 	g_profiler.start(PROFILER_EXTRA);
 
+	attotime time_before = machine->time();
+
 	// execute CPUs if not paused
 	if (!machine->m_paused)
 	{
@@ -1372,7 +1394,7 @@ void running_machine::emscripten_main_loop()
 
 		// Emscripten will call this function at 60Hz, so step the simulation
 		// forward for the amount of time that has passed since the last frame
-		const attotime frametime(0,HZ_TO_ATTOSECONDS(60));
+		const attotime frametime(0, HZ_TO_ATTOSECONDS(60));
 		const attotime stoptime(scheduler->time() + frametime);
 
 		while (!machine->m_paused && !machine->scheduled_event_pending() && scheduler->time() < stoptime)
@@ -1389,6 +1411,17 @@ void running_machine::emscripten_main_loop()
 	// otherwise, just pump video updates through
 	else
 		machine->m_video->frame_update();
+
+	attotime time_after = machine->time();
+
+	if (machine->netplay_active())
+	{
+		auto& netplay = machine->netplay();
+		attotime machine_time = netplay.machine_time();
+		machine_time += (time_after - time_before);
+		netplay.set_machine_time(machine_time);
+		netplay.update();
+	}
 
 	// cancel the emscripten loop if the system has been told to exit
 	if (machine->exit_pending())

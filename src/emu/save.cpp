@@ -185,6 +185,11 @@ void save_manager::save_memory(device_t *device, const char *module, const char 
 
 	// insert us into the list
 	m_entry_list.emplace_back(std::make_unique<state_entry>(val, totalname.c_str(), device, module, tag ? tag : "", index, valsize, valcount));
+
+	if (machine().netplay_active())
+	{
+		machine().netplay().create_memory_block(totalname, val, valsize * valcount);
+	}
 }
 
 

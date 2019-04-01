@@ -100,6 +100,9 @@
 // sound-related
 #include "sound.h"
 
+// netplay-related
+#include "netplay.h"
+
 // generic helpers
 #include "devcb.h"
 #include "bookkeeping.h"

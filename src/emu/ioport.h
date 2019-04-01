@@ -1368,6 +1368,8 @@ struct ioport_port_live
 
 // ======================> ioport_manager
 
+struct netplay_input_state;
+
 // private input port state
 class ioport_manager
 {
@@ -1418,6 +1420,8 @@ private:
 
 	void frame_update_callback();
 	void frame_update();
+	void clear_netplay_inputs(ioport_port& port);
+	void merge_netplay_inputs(ioport_port& port, const std::vector<netplay_input_state*>& states, unsigned int port_index);
 
 	ioport_port *port(const char *tag) const { if (tag) { auto search = m_portlist.find(tag); if (search != m_portlist.end()) return search->second.get(); else return nullptr; } else return nullptr; }
 	void exit();

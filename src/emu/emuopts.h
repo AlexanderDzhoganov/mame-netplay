@@ -197,6 +197,8 @@
 #define OPTION_HTTP_PORT            "http_port"
 #define OPTION_HTTP_ROOT            "http_root"
 
+#define OPTION_NETPLAY              "netplay"
+
 //**************************************************************************
 //  TYPE DEFINITIONS
 //**************************************************************************
@@ -480,6 +482,9 @@ public:
 	bool  http() const { return bool_value(OPTION_HTTP); }
 	short http_port() const { return int_value(OPTION_HTTP_PORT); }
 	const char *http_root() const { return value(OPTION_HTTP_ROOT); }
+
+	// Netplay specific options
+	bool  netplay() const { return bool_value(OPTION_NETPLAY); }
 
 	// slots and devices - the values for these are stored outside of the core_options
 	// structure
