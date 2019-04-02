@@ -378,8 +378,13 @@ bool device_scheduler::can_save() const
 	for (emu_timer *timer = m_timer_list; timer != nullptr; timer = timer->next())
 		if (timer->m_temporary && !timer->expire().is_never())
 		{
-			machine().logerror("Failed save state attempt due to anonymous timers:\n");
-			dump_timers();
+			// netplay calls this often so don't do the debug dump in that case
+			if (!machine().netplay_active())
+			{
+				machine().logerror("Failed save state attempt due to anonymous timers:\n");
+				dump_timers();
+			}
+
 			return false;
 		}
 

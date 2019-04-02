@@ -1368,7 +1368,7 @@ struct ioport_port_live
 
 // ======================> ioport_manager
 
-struct netplay_input_state;
+struct netplay_input_port;
 
 // private input port state
 class ioport_manager
@@ -1420,8 +1420,10 @@ private:
 
 	void frame_update_callback();
 	void frame_update();
-	void clear_netplay_inputs(ioport_port& port);
-	void merge_netplay_inputs(ioport_port& port, const std::vector<netplay_input_state*>& states, unsigned int port_index);
+
+	// netplay helpers
+	void netplay_clear_ports(ioport_port_live& live_port);
+	void netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port);
 
 	ioport_port *port(const char *tag) const { if (tag) { auto search = m_portlist.find(tag); if (search != m_portlist.end()) return search->second.get(); else return nullptr; } else return nullptr; }
 	void exit();
@@ -1471,6 +1473,7 @@ private:
 	// frame time tracking
 	attotime                m_last_frame_time;      // time of the last frame callback
 	attoseconds_t           m_last_delta_nsec;      // nanoseconds that passed since the previous callback
+	attotime                m_netplay_last_time; // time of last netplay inputs update
 
 	// playback/record information
 	emu_file                m_record_file;          // recording file (nullptr if not recording)

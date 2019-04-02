@@ -1,38 +1,104 @@
-#ifndef __NETPLAY_PACKET_H__
-#define __NETPLAY_PACKET_H__
+#ifndef MAME_EMU_NETPLAY_PACKET_H
+#define MAME_EMU_NETPLAY_PACKET_H
 
-class netplay_memory_block;
-class netplay_stream_reader;
-class netplay_stream_writer;
+enum netplay_pkt_flags
+{
+	NETPLAY_HANDSHAKE =     1 << 0,
+	NETPLAY_INITIAL_SYNC =  1 << 1,
+	NETPLAY_SYNC_COMPLETE = 1 << 2,
+	NETPLAY_INPUT =         1 << 3
+};
 
 struct netplay_handshake
 {
 	std::string m_name;
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.write(m_name);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.read(m_name);
+	}
 };
 
-class netplay_packet
+template <typename StreamWriter>
+void netplay_pkt_write(StreamWriter& writer, const attotime& timestamp, unsigned int flags)
 {
+	writer.header('P', 'A', 'K', 'T');
+	writer.write(flags);
+	writer.write(timestamp);
+}
 
-public:
-	attotime get_timestamp() const { return m_timestamp; }
-	void set_timestamp(attotime timestamp) { m_timestamp = timestamp; }
+template <typename StreamReader>
+void netplay_pkt_read(StreamReader& reader, attotime& timestamp, unsigned int& flags)
+{
+	reader.header('P', 'A', 'K', 'T');
+	reader.read(flags);
+	reader.read(timestamp);
+}
 
-	void add_handshake(const netplay_handshake& handshake);
-	netplay_handshake& get_handshake() const;
-	bool has_handshake() const;
+template <typename StreamWriter>
+void netplay_pkt_add_handshake(StreamWriter& writer, const netplay_handshake& handshake)
+{
+	handshake.serialize(writer);
+}
 
-	void add_input_state(const netplay_input_state& input_state);
-	std::unique_ptr<netplay_input_state> get_input_state();
-	bool has_input_state() const;
+template <typename StreamReader>
+void netplay_pkt_read_handshake(StreamReader& reader, netplay_handshake& handshake)
+{
+	handshake.deserialize(reader);
+}
 
-	void add_sync_block(const netplay_memory_block& block);
-	void copy_sync_blocks(std::vector<std::shared_ptr<netplay_memory_block>>& dest_blocks);
-	size_t num_sync_blocks() const;
+template <typename StreamWriter>
+void netplay_pkt_add_input(StreamWriter& writer, const netplay_input& input)
+{
+	input.serialize(writer);
+}
 
-	size_t get_packet_size() const;
+template <typename StreamReader>
+void netplay_pkt_read_input(StreamReader& reader, netplay_input& input)
+{
+	input.deserialize(reader);
+}
 
-private:
-	attotime m_timestamp;
-};
+template <typename StreamWriter>
+void netplay_pkt_add_block(StreamWriter& writer, const netplay_memory& block)
+{
+	writer.header('B', 'L', 'O', 'K');
+	writer.write(block.index());
+	writer.write(block.generation());
+	writer.write((unsigned int)block.size());
+	writer.write(block.data(), block.size());
+}
+
+template <typename StreamReader>
+void netplay_pkt_copy_blocks(StreamReader& reader, const netplay_blocklist& blocks)
+{
+	unsigned int index;
+	unsigned int size;
+	int generation;
+
+	while(!reader.eof())
+	{
+		reader.header('B', 'L', 'O', 'K');
+		reader.read(index);
+		reader.read(generation);
+		reader.read(size);
+
+		netplay_assert(index < blocks.size());
+
+		auto& block = blocks[index];
+		netplay_assert(size == block->size());
+		netplay_assert(generation >= block->generation());
+
+		block->set_generation(generation);
+		reader.read(block->data(), size);
+	}
+}
 
 #endif

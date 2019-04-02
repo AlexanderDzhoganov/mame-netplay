@@ -1,18 +1,18 @@
 #include "emu.h"
-#include "netplay_input_state.h"
+#include "netplay_input.h"
 #include "netplay_peer.h"
 
 netplay_peer::netplay_peer(const std::string& name, const netplay_address& address, attotime join_time, bool self) :
 	m_self(self), m_name(name), m_address(address), m_join_time(join_time) {}
 
-void netplay_peer::add_input_state(std::unique_ptr<netplay_input_state> input_state)
+void netplay_peer::add_input_state(std::unique_ptr<netplay_input> input_state)
 {
 	m_inputs.push_back(std::move(input_state));
 }
 
-std::vector<netplay_input_state*> netplay_peer::get_inputs_before(attotime before_time)
+std::vector<netplay_input*> netplay_peer::get_inputs_before(attotime before_time)
 {
-	std::vector<netplay_input_state*> inputs;
+	std::vector<netplay_input*> inputs;
 
 	for (auto& input : m_inputs)
 	{

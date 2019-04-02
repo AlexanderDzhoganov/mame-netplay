@@ -98,7 +98,7 @@
 #include "ui/uimain.h"
 #include "inputdev.h"
 #include "natkeyboard.h"
-#include "netplay_input_state.h"
+#include "netplay_input.h"
 #include "netplay_peer.h"
 
 #include "osdepend.h"
@@ -1673,6 +1673,7 @@ ioport_manager::ioport_manager(running_machine &machine)
 		m_safe_to_read(false),
 		m_last_frame_time(attotime::zero),
 		m_last_delta_nsec(0),
+		m_netplay_last_time(attotime::zero),
 		m_record_file(machine.options().input_directory(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS),
 		m_playback_file(machine.options().input_directory(), OPEN_FLAG_READ),
 		m_playback_accumulated_speed(0),
@@ -2032,10 +2033,30 @@ void ioport_manager::frame_update()
 {
 g_profiler.start(PROFILER_INPUT);
 
+	if (machine().netplay_active())
+	{
+		// during netplay throttle input updates
+		auto& netplay = machine().netplay();
+		auto machine_time = netplay.machine_time();
+		auto update_freq = attotime(0, ATTOSECONDS_PER_MILLISECOND * netplay.input_freq_ms());
+
+		if (m_netplay_last_time + update_freq > machine_time)
+		{
+			return;
+		}
+
+		m_netplay_last_time = machine_time;
+	}
+
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
-	playback_frame(curtime);
-	record_frame(curtime);
+
+	if (!machine().netplay_active())
+	{
+		// no playback/recording during netplay
+		playback_frame(curtime);
+		record_frame(curtime);
+	}
 
 	// track the duration of the previous frame
 	m_last_delta_nsec = (curtime - m_last_frame_time).as_attoseconds() / ATTOSECONDS_PER_NANOSECOND;
@@ -2052,11 +2073,9 @@ g_profiler.start(PROFILER_INPUT);
 	for (auto &port : m_portlist)
 		port.second->update_defvalue(false);
 
-	std::unique_ptr<netplay_input_state> net_state;
+	std::unique_ptr<netplay_input> net_state;
 	if (machine().netplay_active())
-	{
-		net_state = std::make_unique<netplay_input_state>(machine().netplay().machine_time());
-	}
+		net_state = std::make_unique<netplay_input>(machine().netplay().machine_time());
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
@@ -2065,14 +2084,15 @@ g_profiler.start(PROFILER_INPUT);
 
 		if (machine().netplay_active())
 		{
-			auto& net_port = net_state->add_input_port(port.second->live().defvalue, port.second->live().digital);
-			for (auto analog = port.second->live().analoglist.first(); analog != nullptr; analog = analog->next())
+			auto& live_port = port.second->live();
+			auto& net_port = net_state->add_input_port(live_port.defvalue, live_port.digital);
+			for (auto& analog : live_port.analoglist)
 	  	{
-				net_port.add_analog_port(analog->m_accum, analog->m_previous, analog->m_sensitivity, analog->m_reverse);
+				net_port.add_analog_port(analog.m_accum, analog.m_previous, analog.m_sensitivity, analog.m_reverse);
 			}
 
-			// clear all inputs so immediate local input doesn't affect the emulator state
-			clear_netplay_inputs(*port.second);
+			// clear all inputs so we can overwrite them with the synced ones
+			netplay_clear_ports(live_port);
 		}
 		else
 		{
@@ -2087,7 +2107,7 @@ g_profiler.start(PROFILER_INPUT);
 		auto& netplay = machine().netplay();
 		netplay.add_input_state(std::move(net_state));
 
-		auto& peers = netplay.get_peers();
+		auto& peers = netplay.peers();
 		auto machine_time = netplay.machine_time();
 
 		for (auto& peer : peers)
@@ -2099,7 +2119,12 @@ g_profiler.start(PROFILER_INPUT);
 			auto port_index = 0u;
 			for (auto &port : m_portlist)
 			{
-				merge_netplay_inputs(*port.second, inputs, port_index);
+				for (auto& state : inputs)
+				{
+					auto& input_port = state->m_ports[port_index];
+					netplay_update_ports(port.second->live(), input_port);
+				}
+
 				port_index++;
 			}
 			
@@ -2124,50 +2149,41 @@ g_profiler.start(PROFILER_INPUT);
 g_profiler.stop();
 }
 
-void ioport_manager::clear_netplay_inputs(ioport_port& port)
+void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
 {
 	// read the default value and the digital state
-  port.live().digital = 0;
-	port.live().defvalue = 0;
+  live_port.digital = 0;
+	live_port.defvalue = 0;
 
   // loop over analog ports and save their data
-  for (analog_field *analog = port.live().analoglist.first(); analog != NULL; analog = analog->next())
+  for (auto& analog : live_port.analoglist)
   {
     // reset current and previous values
-    analog->m_accum = 0;
-    analog->m_previous = 0;
-		analog->m_sensitivity = 0;
-		analog->m_reverse = 0;
+    analog.m_accum = 0;
+    analog.m_previous = 0;
+		analog.m_sensitivity = 0;
+		analog.m_reverse = 0;
   }
 }
 
-void ioport_manager::merge_netplay_inputs(ioport_port& port, const std::vector<netplay_input_state*>& states, unsigned int port_index)
+void ioport_manager::netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port)
 {
-	for (auto& state : states)
+	// NETPLAY TODO: separate per peer mappings
+	live_port.defvalue |= net_port.m_defvalue;
+	live_port.digital |= net_port.m_digital;
+
+	auto analog_index = 0u;
+	for (auto& analog : live_port.analoglist)
 	{
-		auto& input_port = state->m_ports[port_index];
+		auto& analog_port = net_port.m_analog_ports[analog_index];
 
-		// read the default value and the digital state
-		port.live().defvalue |= input_port.m_defvalue;
-		port.live().digital |= input_port.m_digital;
+		analog.m_accum |= analog_port.m_accum;
+		analog.m_previous |= analog_port.m_previous;
+		analog.m_sensitivity |= analog_port.m_sensitivity;
+		analog.m_reverse |= analog_port.m_reverse;
 
-		// loop over analog ports and save their data
-		auto analog_index = 0u;
-		for (analog_field *analog = port.live().analoglist.first(); analog != NULL; analog = analog->next())
-		{
-			auto& analog_port = input_port.m_analog_ports[analog_index];
-
-			// read current and previous values
-			analog->m_accum |= analog_port.m_accum;
-			analog->m_previous |= analog_port.m_previous;
-
-			// read configuration information
-			analog->m_sensitivity |= analog_port.m_sensitivity;
-			analog->m_reverse |= analog_port.m_reverse;
-
-			analog_index++;
-		}
-  }
+		analog_index++;
+	}
 }
 
 //-------------------------------------------------

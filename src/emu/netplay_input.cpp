@@ -1,7 +1,7 @@
 #include <vector>
 
 #include "emu.h"
-#include "netplay_input_state.h"
+#include "netplay_input.h"
 
 netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous, int sensitivity, int reverse)
 {
@@ -14,10 +14,10 @@ netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous
 	return analog_port;
 }
 
-netplay_input_state::netplay_input_state(const attotime& timestamp) :
+netplay_input::netplay_input(const attotime& timestamp) :
 	m_timestamp(timestamp), m_consumed(false) {}
 
-netplay_input_port& netplay_input_state::add_input_port(int defvalue, int digital)
+netplay_input_port& netplay_input::add_input_port(int defvalue, int digital)
 {
 	m_ports.emplace_back();
 	auto& input_port = m_ports.back();
@@ -27,7 +27,7 @@ netplay_input_port& netplay_input_state::add_input_port(int defvalue, int digita
 }
 
 // returns when this input state is supposed to take effect
-attotime netplay_input_state::calculate_future_time(int latency_ms) const
+attotime netplay_input::calculate_future_time(int latency_ms) const
 {
 	latency_ms = std::max(40, std::min(500, latency_ms));
 	return m_timestamp + attotime(0, ATTOSECONDS_PER_MILLISECOND * latency_ms);

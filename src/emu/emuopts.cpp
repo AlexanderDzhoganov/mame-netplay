@@ -222,6 +222,7 @@ const options_entry emu_options::s_option_entries[] =
 
 	{ nullptr,                                           nullptr,     OPTION_HEADER,     "NETPLAY OPTIONS" },
 	{ OPTION_NETPLAY,                                    "0",         OPTION_BOOLEAN,    "enable netplay" },
+	{ OPTION_NETPLAY_HOST,                               "",          OPTION_STRING,     "address of the netplay host" },
 
 	{ nullptr }
 };

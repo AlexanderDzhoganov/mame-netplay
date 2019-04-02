@@ -198,6 +198,7 @@
 #define OPTION_HTTP_ROOT            "http_root"
 
 #define OPTION_NETPLAY              "netplay"
+#define OPTION_NETPLAY_HOST         "netplay_host"
 
 //**************************************************************************
 //  TYPE DEFINITIONS
@@ -485,6 +486,7 @@ public:
 
 	// Netplay specific options
 	bool  netplay() const { return bool_value(OPTION_NETPLAY); }
+	const char *netplay_host() const { return value(OPTION_NETPLAY_HOST); }
 
 	// slots and devices - the values for these are stored outside of the core_options
 	// structure
