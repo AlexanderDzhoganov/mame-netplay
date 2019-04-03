@@ -8,6 +8,7 @@
 #ifndef MAME_EMU_NETPLAY_H
 #define MAME_EMU_NETPLAY_H
 
+#include "netplay_util.h"
 #include "netplay_socket_def.h"
 
 #define NETPLAY_LOG(...) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
@@ -23,6 +24,16 @@ struct netplay_input;
 
 typedef std::vector<std::shared_ptr<netplay_memory>> netplay_blocklist;
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
+
+struct netplay_state
+{
+	netplay_blocklist m_blocks;
+	attotime m_timestamp;
+	unsigned long long m_frame_count;
+	int m_generation;
+};
+
+typedef netplay_circular_buffer<netplay_state, 3> netplay_statelist;
 
 class netplay_manager
 {
@@ -44,12 +55,14 @@ public:
 	bool debug() const { return m_debug; }
 	void set_debug(bool debug) { m_debug = debug; }
 	bool catching_up() const { return m_catching_up; }
+	bool waiting_for_client() const { return m_waiting_for_client; }
 
 	attotime machine_time() const { return m_machine_time; }
 	attotime system_time() const;
 	unsigned long long frame_count() const { return m_frame_count; }
 
 	const netplay_peerlist& peers() const { return m_peers; }
+	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
 
 protected:
 	// called by socket implementation
@@ -65,12 +78,12 @@ protected:
 private:
 	void update_host();
 	void update_client();
-	void store_sync();
-	void load_sync();
-	void send_initial_sync(const netplay_peer& peer);
+	void store_state();
+	void load_state(const netplay_state& state);
+	bool rollback(const attotime& to_time);
+	void send_full_sync(const netplay_peer& peer);
 
-	std::shared_ptr<netplay_peer> add_peer(const std::string& name, const netplay_addr& address, bool self = false);
-	void cleanup_inputs();
+	netplay_peer& add_peer(const std::string& name, const netplay_addr& address, bool self = false);
 
 	static unsigned char memory_checksum(const netplay_blocklist& blocks);
 
@@ -86,10 +99,7 @@ private:
 	netplay_peerlist m_peers;          // connected peers
 
 	netplay_blocklist m_active_blocks; // active (in-use) memory blocks by the emulator
-
-	netplay_blocklist m_sync_blocks;   // last agreed upon sync data or received full sync
-	size_t m_sync_generation;          // the generation id of the current sync blocks
-	attotime m_sync_time;              // timestamp of last sync
+	netplay_statelist m_states;        // saved emulator states
 
 	attotime m_last_system_time;       // system time on last update
 	attotime m_machine_time;           // current machine time

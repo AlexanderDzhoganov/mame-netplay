@@ -2095,34 +2095,34 @@ g_profiler.start(PROFILER_INPUT);
 		auto& peers = netplay.peers();
 		auto frame_index = netplay.frame_count();
 
+		// first apply my own inputs immediately as those can't cause a rollback
+		auto port_index = 0u;
+		for (auto &port : m_portlist)
+		{
+			auto& input_port = net_input->m_ports[port_index++];
+			netplay_update_ports(port.second->live(), input_port);
+		}
+
+		// then we'll apply remote inputs and try to predict the ones we are missing
+		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : peers)
 		{
-			// get all inputs from this peer before the current machine time
-			netplay_input* inputs = nullptr;
-
 			if (peer->self())
-			{
-				// if the peer is us then we already have the inputs
-				inputs = net_input.get();
-			}
-			else
-			{
-				inputs = peer->get_inputs_for(frame_index);
-			}
+				continue;
 
+			// fetch this peer's inputs for this frame
+			auto inputs = peer->get_inputs_for(frame_index - 3);
 			if (inputs == nullptr)
 			{
 				continue; // NETPLAY TODO: predict using old inputs
 			}
 
 			// merge the inputs with the emulator ones
-			auto port_index = 0u;
+			port_index = 0u;
 			for (auto &port : m_portlist)
 			{
-				auto& input_port = inputs->m_ports[port_index];
+				auto& input_port = inputs->m_ports[port_index++];
 				netplay_update_ports(port.second->live(), input_port);
-
-				port_index++;
 			}
 		}
 

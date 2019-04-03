@@ -27,19 +27,14 @@ netplay_input* netplay_peer::get_inputs_for(unsigned long long frame_index)
 	return nullptr;
 }
 
-void netplay_peer::delete_inputs_before(attotime before_time)
+netplay_input* netplay_peer::get_latest_input()
 {
-	for (auto it = m_inputs.begin(); it != m_inputs.end(); ++it)
+	if (m_inputs.empty())
 	{
-		if ((*it)->m_timestamp <= before_time)
-		{
-			it = m_inputs.erase(it);
-			if (it == m_inputs.end())
-			{
-				break;
-			}
-		}
+		return nullptr;
 	}
+
+	return m_inputs.newest().get();
 }
 
 int netplay_peer::calculate_avg_latency() const

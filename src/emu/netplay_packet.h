@@ -3,10 +3,11 @@
 
 enum netplay_packet_flags
 {
-	NETPLAY_HANDSHAKE = 1 << 0, // client->server handshake
-	NETPLAY_SYNC      = 1 << 1, // packet contains sync data
-	NETPLAY_SYNC_ACK  = 1 << 2, // sync acknowledgement
-	NETPLAY_GOT_INPUT = 1 << 3, // packet contains player inputs
+	NETPLAY_HANDSHAKE  = 1 << 0, // client->server handshake
+	NETPLAY_SYNC       = 1 << 1, // packet contains sync data
+	NETPLAY_SYNC_ACK   = 1 << 2, // sync acknowledgement
+	NETPLAY_SYNC_CHECK = 1 << 3, // sync check
+	NETPLAY_INPUTS     = 1 << 4, // packet contains player inputs
 };
 
 struct netplay_handshake
@@ -31,7 +32,7 @@ struct netplay_sync
 	attotime m_sync_time;             // machine time at which the sync occurred
 	unsigned long long m_frame_count; // frame count at sync
 	int m_generation;                 // sync generation
-	
+
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
 	{
@@ -48,6 +49,26 @@ struct netplay_sync
 		reader.read(m_sync_time);
 		reader.read(m_frame_count);
 		reader.read(m_generation);
+	}
+};
+
+struct netplay_sync_check
+{
+	int m_generation;         // sync generation
+	unsigned char m_checksum; // memory checksum
+	
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.write(m_generation);
+		writer.write(m_checksum);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.read(m_generation);
+		reader.read(m_checksum);
 	}
 };
 
@@ -95,7 +116,7 @@ void netplay_packet_copy_blocks(StreamReader& reader, const netplay_blocklist& b
 
 		auto& block = blocks[index];
 		netplay_assert(size == block->size());
-		netplay_assert(generation >= block->generation());
+		// netplay_assert(generation >= block->generation());
 
 		block->set_generation(generation);
 		reader.read(block->data(), size);

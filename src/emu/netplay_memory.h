@@ -21,8 +21,6 @@ public:
 	bool owns_memory() const { return m_owns_memory; }
 	int generation() const { return m_generation; }
 	void set_generation(int generation) { m_generation = generation; }
-	bool dirty() const { return m_dirty; }
-	void set_dirty(bool dirty) { m_dirty = dirty; }
 	std::string get_debug_string();
 
 private:
@@ -32,7 +30,6 @@ private:
 	char* m_data;
 	bool m_owns_memory;
 	int m_generation;
-	bool m_dirty;
 };
 
 #endif

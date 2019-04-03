@@ -11,8 +11,7 @@ netplay_memory::netplay_memory(unsigned int index, const std::string& name, size
 	m_name(name),
 	m_data(nullptr),
 	m_owns_memory(true),
-	m_generation(0),
-	m_dirty(false)
+	m_generation(0)
 {
 	netplay_assert(size > 0);
 	m_data = new char[size];
@@ -30,8 +29,7 @@ netplay_memory::netplay_memory
 	m_name(name),
 	m_data((char*)data),
 	m_owns_memory(false),
-	m_generation(0),
-	m_dirty(false)
+	m_generation(0)
 {
 	netplay_assert(data != nullptr);
 	netplay_assert(size > 0);
