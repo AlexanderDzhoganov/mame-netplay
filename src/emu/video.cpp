@@ -222,6 +222,12 @@ void video_manager::set_frameskip(int frameskip)
 
 void video_manager::frame_update(bool from_debugger)
 {
+	if (machine().netplay_active() && machine().netplay().catching_up())
+	{
+		// if netplay is active and we're catching up then skip rendering
+		return;
+	}
+
 	// only render sound and video if we're in the running phase
 	machine_phase const phase = machine().phase();
 	bool skipped_it = m_skipping_this_frame;

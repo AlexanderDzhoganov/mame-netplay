@@ -1122,9 +1122,12 @@ void sound_manager::update(void *ptr, int param)
 
 	// play the result
 	if (finalmix_offset > 0)
-	{
-		if (!m_nosound_mode)
+	{	
+		// if nosound mode is off and either netplay is not active
+		// or it's not catching up then update the audio stream
+		if (!m_nosound_mode && (!machine().netplay_active() || !machine().netplay().catching_up()))
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
+			
 		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
 		machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
 		if (m_wavfile != nullptr)

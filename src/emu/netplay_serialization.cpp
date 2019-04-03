@@ -11,7 +11,7 @@ void netplay_stream_writer<T>::write(const std::string& value)
 template <typename T>
 void netplay_stream_reader<T>::header(char a, char b, char c, char d)
 {
-	unsigned char arr[4];
+	char arr[4];
 	read(arr, 4);
 
 	if (arr[0] != a || arr[1] != b || arr[2] != c || arr[3] != d)

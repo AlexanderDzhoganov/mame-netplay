@@ -21,16 +21,6 @@ class netplay_memory;
 class netplay_peer;
 struct netplay_input;
 
-struct netplay_sync
-{
-	netplay_sync(const std::shared_ptr<netplay_peer>& peer, int generation, bool initial_sync) :
-		m_peer(peer), m_generation(generation), m_initial_sync(initial_sync) {}
-
-	std::shared_ptr<netplay_peer> m_peer; // peer which is syncing
-	int m_generation;                     // sync generation
-	bool m_initial_sync;                  // is this the initial sync
-};
-
 typedef std::vector<std::shared_ptr<netplay_memory>> netplay_blocklist;
 
 class netplay_manager
@@ -55,7 +45,8 @@ public:
 	void set_debug(bool debug) { m_debug = debug; }
 
 	attotime machine_time() const { return m_machine_time; }
-	
+	bool catching_up() const { return m_catching_up; }
+
 	const std::vector<std::shared_ptr<netplay_peer>>& peers() const { return m_peers; }
 
 protected:
@@ -95,18 +86,17 @@ private:
 	unsigned int m_sync_every;      // (server only) how often to sync in seconds
 	unsigned int m_input_freq_ms;   // how often to sync inputs in milliseconds
 
-	std::unique_ptr<netplay_socket> m_socket;                  // network socket implementation
-	std::vector<std::shared_ptr<netplay_peer>> m_peers;        // connected peers
+	std::unique_ptr<netplay_socket> m_socket;           // network socket implementation
+	std::vector<std::shared_ptr<netplay_peer>> m_peers; // connected peers
 
-	netplay_blocklist m_active_blocks;                         // active (in-use) memory blocks by the emulator
+	netplay_blocklist m_active_blocks;                  // active (in-use) memory blocks by the emulator
 
-	netplay_blocklist m_sync_blocks;                           // stale blocks used for sync
-	size_t m_sync_generation;                                  // the generation id of the current sync blocks
-	attotime m_sync_time;                                      // timestamp of last sync
+	netplay_blocklist m_sync_blocks;                    // stale blocks used for sync
+	size_t m_sync_generation;                           // the generation id of the current sync blocks
+	attotime m_sync_time;                               // timestamp of last sync
 
-	std::vector<std::shared_ptr<netplay_sync>> m_sync_objects; // client synchronization data
-
-	attotime m_machine_time;                                   // current machine time
+	attotime m_machine_time;                            // current machine time
+	bool     m_catching_up;                             // are we catching up?
 };
 
 #endif
