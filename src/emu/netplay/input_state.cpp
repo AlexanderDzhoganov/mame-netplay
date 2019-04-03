@@ -1,9 +1,10 @@
 #include <vector>
 
-#include "emu.h"
-#include "netplay_input.h"
+#include "attotime.h"
+#include "netplay.h"
+#include "netplay/input_state.h"
 
-netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous, int sensitivity, int reverse)
+netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous, int sensitivity, bool reverse)
 {
 	m_analog_ports.emplace_back();
 	auto& analog_port = m_analog_ports.back();

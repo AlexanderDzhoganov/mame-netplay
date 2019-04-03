@@ -12,7 +12,6 @@ public:
 
 	void copy_from(const netplay_memory& block);
 	void copy_from(void* data, size_t size, int generation);
-	unsigned char checksum() const;
 
 	unsigned int index() const { return m_index; }
 	const std::string& get_name() const { return m_name; }
@@ -22,6 +21,9 @@ public:
 	int generation() const { return m_generation; }
 	void set_generation(int generation) { m_generation = generation; }
 	std::string get_debug_string();
+	
+	unsigned char checksum() const;
+	static unsigned char checksum(const netplay_blocklist& blocks);
 
 private:
 	size_t m_size;

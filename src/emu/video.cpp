@@ -21,6 +21,7 @@
 #include "xmlfile.h"
 
 #include "osdepend.h"
+#include "netplay.h"
 
 
 //**************************************************************************
@@ -198,8 +199,14 @@ video_manager::video_manager(running_machine &machine)
 
 void video_manager::set_frameskip(int frameskip)
 {
+	if (machine().options().netplay())
+	{
+		m_auto_frameskip = false;
+		m_frameskip_level = 0;
+	}
+
 	// -1 means autoframeskip
-	if (frameskip == -1)
+	else if (frameskip == -1)
 	{
 		m_auto_frameskip = true;
 		m_frameskip_level = 0;
@@ -222,12 +229,6 @@ void video_manager::set_frameskip(int frameskip)
 
 void video_manager::frame_update(bool from_debugger)
 {
-	/*if (machine().netplay_active() && machine().netplay().catching_up())
-	{
-		// if netplay is active and we're catching up then skip rendering
-		return;
-	}*/
-
 	// only render sound and video if we're in the running phase
 	machine_phase const phase = machine().phase();
 	bool skipped_it = m_skipping_this_frame;
@@ -244,10 +245,8 @@ void video_manager::frame_update(bool from_debugger)
 			m_empty_skip_count = 0;
 	}
 
-	if (machine().netplay_active())
-	{
-		skipped_it = false; // no frameskip during netplay
-	}
+	if (machine().netplay_active() && machine().netplay().catching_up())
+		skipped_it = true;
 
 	// draw the user interface
 	emulator_info::draw_user_interface(machine());
@@ -790,7 +789,7 @@ bool video_manager::is_recording() const
 inline bool video_manager::effective_autoframeskip() const
 {
 	// if we're fast forwarding or paused, autoframeskip is disabled
-	if (m_fastforward || machine().paused())
+	if (m_fastforward || machine().paused() || machine().netplay_active())
 		return false;
 
 	// otherwise, it's up to the user
@@ -806,6 +805,9 @@ inline bool video_manager::effective_autoframeskip() const
 
 inline int video_manager::effective_frameskip() const
 {
+	if (machine().netplay_active())
+		return 0;
+
 	// if we're fast forwarding, use the maximum frameskip
 	if (m_fastforward)
 		return FRAMESKIP_LEVELS - 1;
@@ -828,7 +830,7 @@ inline bool video_manager::effective_throttle() const
 		return true;
 
 	// if we're fast forwarding, we don't throttle
-	if (m_fastforward)
+	if (m_fastforward || machine().netplay_active())
 		return false;
 
 	// otherwise, it's up to the user
@@ -1054,12 +1056,6 @@ osd_ticks_t video_manager::throttle_until_ticks(osd_ticks_t target_ticks)
 	// we're allowed to sleep via the OSD code only if we're configured to do so
 	// and we're not frameskipping due to autoframeskip, or if we're paused
 	bool allowed_to_sleep = (machine().options().sleep() && (!effective_autoframeskip() || effective_frameskip() == 0)) || machine().paused();
-
-	if (machine().netplay_active())
-	{
-		// not allowed to sleep during netplay
-		allowed_to_sleep = false;
-	}
 
 	// loop until we reach our target
 	g_profiler.start(PROFILER_IDLE);

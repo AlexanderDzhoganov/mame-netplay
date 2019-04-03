@@ -116,7 +116,6 @@ void netplay_packet_copy_blocks(StreamReader& reader, const netplay_blocklist& b
 
 		auto& block = blocks[index];
 		netplay_assert(size == block->size());
-		// netplay_assert(generation >= block->generation());
 
 		block->set_generation(generation);
 		reader.read(block->data(), size);

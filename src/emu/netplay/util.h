@@ -1,6 +1,19 @@
 #ifndef MAME_EMU_NETPLAY_UTIL_H
 #define MAME_EMU_NETPLAY_UTIL_H
 
+#include <stdio.h>
+
+#define NETPLAY_LOG(...) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+
+#ifndef NO_NETPLAY_ASSERT
+#define netplay_assert(COND) do { \
+	if (!(COND)) { \
+		printf("\n\nassertion failed: " #COND " (%s:%d)\n\n", __FILE__, __LINE__); \
+		exit(1); \
+	} \
+} while(0);
+#endif
+
 template <typename T, size_t N>
 class netplay_circular_buffer
 {
@@ -20,12 +33,27 @@ public:
 		m_cursor = (m_cursor + 1) % N;
 	}
 
-	void offset_cursor(int offset) { m_cursor = (m_cursor + offset) % std::min(m_buffer.size(), N); }
 	bool empty() const { return m_buffer.empty(); }
 	size_t size() const { return m_buffer.size(); }
 	size_t capacity() const { return N; }
-	T& newest() { return m_cursor == 0 ? m_buffer.back() : m_buffer[m_cursor - 1]; }
 	const std::vector<T>& items() const { return m_buffer; }
+
+	T& newest()
+	{
+		netplay_assert(!m_buffer.empty());
+		return m_cursor == 0 ? m_buffer.back() : m_buffer[m_cursor - 1];
+	}
+
+	const T& newest() const
+	{
+		netplay_assert(!m_buffer.empty());
+		return m_cursor == 0 ? m_buffer.back() : m_buffer[m_cursor - 1];
+	}
+	
+	void advance(int offset)
+	{ 
+		m_cursor = (m_cursor + offset) % std::min(m_buffer.size(), N);
+	}
 
 	auto begin() { return m_buffer.begin(); }
 	auto begin() const { return m_buffer.begin(); }

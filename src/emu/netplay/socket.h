@@ -26,8 +26,8 @@ public:
 	void send(netplay_socket_stream& stream, const netplay_addr& address);
 	bool receive(netplay_socket_stream& stream, netplay_addr& address);
 
-	bool socket_connected(const netplay_addr& address) { return m_manager.socket_connected(address); }
-	void socket_disconnected(const netplay_addr& address) { m_manager.socket_disconnected(address); }
+	bool socket_connected(const netplay_addr& address);
+	void socket_disconnected(const netplay_addr& address);
 
 	static std::string addr_to_str(const netplay_addr& address);
 	static netplay_addr str_to_addr(const std::string& address);

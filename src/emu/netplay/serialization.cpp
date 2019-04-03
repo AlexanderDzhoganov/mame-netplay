@@ -1,5 +1,7 @@
-#include "emu.h"
-#include "netplay_serialization.h"
+#include <string>
+
+#include "netplay.h"
+#include "netplay/serialization.h"
 
 template <typename T>
 void netplay_stream_writer<T>::write(const std::string& value)

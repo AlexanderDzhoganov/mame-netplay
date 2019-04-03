@@ -25,7 +25,7 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "coreutil.h"
-
+#include "netplay.h"
 
 //**************************************************************************
 //  DEBUGGING

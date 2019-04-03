@@ -84,12 +84,13 @@
 #include "network.h"
 
 #ifndef NO_NETPLAY
-#include "netplay_util.h"
-#include "netplay_memory.h"
-#include "netplay_serialization.h"
-#include "netplay_socket.h"
-#include "netplay_input.h"
-#include "netplay_peer.h"
+#include "netplay.h"
+#include "netplay/util.h"
+#include "netplay/memory.h"
+#include "netplay/serialization.h"
+#include "netplay/socket.h"
+#include "netplay/input_state.h"
+#include "netplay/peer.h"
 #endif
 
 #include "romload.h"
@@ -342,7 +343,8 @@ int running_machine::run(bool quiet)
 		nvram_load();
 
 		// set the time on RTCs (this may overwrite parts of NVRAM)
-		set_rtc_datetime(system_time(m_base_time));
+		// force to zero for netplay
+		set_rtc_datetime(system_time(options().netplay() ? 0 : m_base_time));
 
 		sound().ui_mute(false);
 		if (!quiet)
@@ -354,11 +356,6 @@ int running_machine::run(bool quiet)
 
 		// perform a soft reset -- this takes us to the running phase
 		soft_reset();
-
-		if (m_netplay_active && netplay().debug())
-		{
-			netplay().print_debug_info();
-		}
 
 		// handle initial load
 		if (m_saveload_schedule != saveload_schedule::NONE)
@@ -378,12 +375,21 @@ int running_machine::run(bool quiet)
 		{
 			g_profiler.start(PROFILER_EXTRA);
 
-			// execute CPUs if not paused
-			if (!m_paused)
+			if (!m_paused && !netplay_active())
+			{
+				// execute CPUs if not paused and not in netplay
 				m_scheduler.timeslice();
-			// otherwise, just pump video updates through
+			}
+			else if (netplay_active())
+			{
+				// if netplay is active it takes over scheduling
+				netplay().update();
+			}
 			else
+			{
+				// otherwise, just pump video updates through
 				m_video->frame_update();
+			}
 
 			// handle save/load
 			if (m_saveload_schedule != saveload_schedule::NONE)
@@ -391,6 +397,7 @@ int running_machine::run(bool quiet)
 
 			g_profiler.stop();
 		}
+
 		m_manager.http()->clear();
 
 		// and out via the exit phase
@@ -400,6 +407,7 @@ int running_machine::run(bool quiet)
 		sound().ui_mute(true);
 		if (options().nvram_save())
 			nvram_save();
+
 		m_configuration->save_settings();
 	}
 	catch (emu_fatalerror &fatal)

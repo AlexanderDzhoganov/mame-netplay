@@ -100,9 +100,10 @@
 #include "natkeyboard.h"
 
 #ifndef NO_NETPLAY
-#include "netplay_util.h"
-#include "netplay_input.h"
-#include "netplay_peer.h"
+#include "netplay.h"
+#include "netplay/util.h"
+#include "netplay/input_state.h"
+#include "netplay/peer.h"
 #endif
 
 #include "osdepend.h"
@@ -2038,9 +2039,21 @@ g_profiler.start(PROFILER_INPUT);
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
 
-	if (!machine().netplay_active())
+	if (machine().netplay_active())
 	{
-		// no playback/recording during netplay
+		static unsigned long long last_frame_index = 0;
+		auto frame_index = machine().netplay().frame_count();
+
+		// only process inputs once per update during netplay
+		if (last_frame_index == frame_index)
+		{
+			return;
+		}
+
+		last_frame_index = frame_index;
+	}
+	else
+	{
 		playback_frame(curtime);
 		record_frame(curtime);
 	}
@@ -2061,8 +2074,8 @@ g_profiler.start(PROFILER_INPUT);
 		port.second->update_defvalue(false);
 
 	std::unique_ptr<netplay_input> net_input;
-	if (machine().netplay_active())
-		net_input = std::make_unique<netplay_input>(curtime, machine().netplay().frame_count());
+	if (machine().netplay_active() && !machine().netplay().catching_up())
+		net_input = std::make_unique<netplay_input>(machine().netplay().machine_time(), machine().netplay().frame_count());
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
@@ -2072,10 +2085,14 @@ g_profiler.start(PROFILER_INPUT);
 		if (machine().netplay_active())
 		{
 			auto& live_port = port.second->live();
-			auto& net_port = net_input->add_input_port(live_port.defvalue, live_port.digital);
-			for (auto& analog : live_port.analoglist)
-	  	{
-				net_port.add_analog_port(analog.m_accum, analog.m_previous, analog.m_sensitivity, analog.m_reverse);
+
+			if (net_input != nullptr)
+			{
+				auto& net_port = net_input->add_input_port(live_port.defvalue, live_port.digital);
+				for (auto& analog : live_port.analoglist)
+				{
+					net_port.add_analog_port(analog.m_accum, analog.m_previous, analog.m_sensitivity, analog.m_reverse);
+				}
 			}
 
 			// clear all inputs so we can overwrite them with the synced ones
@@ -2094,31 +2111,25 @@ g_profiler.start(PROFILER_INPUT);
 		auto& netplay = machine().netplay();
 		auto& peers = netplay.peers();
 		auto frame_index = netplay.frame_count();
-
-		// first apply my own inputs immediately as those can't cause a rollback
-		auto port_index = 0u;
-		for (auto &port : m_portlist)
-		{
-			auto& input_port = net_input->m_ports[port_index++];
-			netplay_update_ports(port.second->live(), input_port);
-		}
+		auto effective_frame = frame_index - netplay.input_delay();
 
 		// then we'll apply remote inputs and try to predict the ones we are missing
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : peers)
 		{
-			if (peer->self())
-				continue;
-
-			// fetch this peer's inputs for this frame
-			auto inputs = peer->get_inputs_for(frame_index - 3);
+			// fetch this peer's inputs for frame (frame_index - input_delay)
+			auto inputs = peer->get_inputs_for(effective_frame);
 			if (inputs == nullptr)
 			{
-				continue; // NETPLAY TODO: predict using old inputs
+				inputs = peer->predict_input_state<netplay_repeat_last_predictor>(effective_frame);
+				if (inputs == nullptr)
+				{
+					break;
+				}
 			}
 
 			// merge the inputs with the emulator ones
-			port_index = 0u;
+			auto port_index = 0u;
 			for (auto &port : m_portlist)
 			{
 				auto& input_port = inputs->m_ports[port_index++];
@@ -2127,7 +2138,10 @@ g_profiler.start(PROFILER_INPUT);
 		}
 
 		// finally submit my input state for sending
-		netplay.add_input_state(std::move(net_input));
+		if (net_input != nullptr)
+		{
+			netplay.add_input_state(std::move(net_input));
+		}
 	}
 
 	// loop over all input ports

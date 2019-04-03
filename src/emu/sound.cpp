@@ -14,8 +14,7 @@
 #include "osdepend.h"
 #include "config.h"
 #include "wavwrite.h"
-
-
+#include "netplay.h"
 
 //**************************************************************************
 //  DEBUGGING
@@ -1122,16 +1121,24 @@ void sound_manager::update(void *ptr, int param)
 
 	// play the result
 	if (finalmix_offset > 0)
-	{	
+	{
+		bool netplay_catching_up = false;
+		if (machine().netplay_active() && machine().netplay().catching_up())
+			netplay_catching_up = true;
+
 		// if nosound mode is off and either netplay is not active
 		// or it's not catching up then update the audio stream
-		if (!m_nosound_mode && (!machine().netplay_active() || !machine().netplay().catching_up()))
+		if (!m_nosound_mode && !netplay_catching_up)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
-			
-		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
-		machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
-		if (m_wavfile != nullptr)
-			wav_add_data_16(m_wavfile, finalmix, finalmix_offset);
+		
+		if (!netplay_catching_up)
+		{
+			machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
+			machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
+
+			if (m_wavfile != nullptr)
+				wav_add_data_16(m_wavfile, finalmix, finalmix_offset);
+		}
 	}
 
 	// see if we ticked over to the next second

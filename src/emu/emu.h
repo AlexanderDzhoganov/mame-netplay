@@ -101,7 +101,7 @@
 #include "sound.h"
 
 // netplay-related
-#include "netplay.h"
+// #include "netplay.h"
 
 // generic helpers
 #include "devcb.h"

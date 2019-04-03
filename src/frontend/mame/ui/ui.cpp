@@ -30,6 +30,7 @@
 #include "ui/state.h"
 #include "ui/viewgfx.h"
 #include "imagedev/cassette.h"
+#include "netplay.h"
 
 
 /***************************************************************************

@@ -1,7 +1,9 @@
-#include "emu.h"
-#include "netplay_util.h"
-#include "netplay_input.h"
-#include "netplay_peer.h"
+#include <string>
+#include <memory>
+
+#include "netplay.h"
+#include "netplay/input_state.h"
+#include "netplay/peer.h"
 
 netplay_peer::netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self) :
 	m_self(self),
@@ -27,26 +29,15 @@ netplay_input* netplay_peer::get_inputs_for(unsigned long long frame_index)
 	return nullptr;
 }
 
-netplay_input* netplay_peer::get_latest_input()
+netplay_input* netplay_peer::get_predicted_inputs_for(unsigned long long frame_index)
 {
-	if (m_inputs.empty())
+	for (auto& input : m_predicted_inputs)
 	{
-		return nullptr;
+		if (input->m_frame_index == frame_index)
+		{
+			return input.get();
+		}
 	}
 
-	return m_inputs.newest().get();
-}
-
-int netplay_peer::calculate_avg_latency() const
-{
-	int avg_latency_ms = 0;
-
-	for (auto measurement : m_latency_history.items())
-	{
-		avg_latency_ms += measurement;
-	}
-
-	avg_latency_ms /= m_latency_history.size();
-
-	return avg_latency_ms;
+	return nullptr;
 }

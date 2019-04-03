@@ -1,5 +1,8 @@
-#include "emu.h"
-#include "netplay_memory.h"
+#include <string>
+#include <sstream>
+
+#include "netplay.h"
+#include "netplay/memory.h"
 
 //-------------------------------------------------
 // netplay_memory
@@ -58,6 +61,18 @@ unsigned char netplay_memory::checksum() const
 	for (auto i = 0u; i < m_size; i++)
 	{
 		checksum ^= m_data[i];
+	}
+
+	return checksum;
+}
+
+unsigned char netplay_memory::checksum(const netplay_blocklist& blocks)
+{
+	unsigned char checksum = 0;
+
+	for (auto& block : blocks)
+	{
+		checksum ^= block->checksum();
 	}
 
 	return checksum;

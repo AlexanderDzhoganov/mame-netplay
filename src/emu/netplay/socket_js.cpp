@@ -3,9 +3,9 @@
 #include <deque>
 #include <emscripten/emscripten.h>
 
-#include "emu.h"
-#include "netplay_serialization.h"
-#include "netplay_socket.h"
+#include "netplay.h"
+#include "netplay/serialization.h"
+#include "netplay/socket.h"
 
 struct js_packet
 {
@@ -65,6 +65,16 @@ bool netplay_socket::receive(netplay_socket_stream& stream, netplay_addr& addres
 	stream.set_data(std::move(packet.data));
   netplay_recv_queue.pop_front();
 	return true;
+}
+
+bool netplay_socket::socket_connected(const netplay_addr& address)
+{
+  return m_manager.socket_connected(address);
+}
+
+void netplay_socket::socket_disconnected(const netplay_addr& address)
+{
+  m_manager.socket_disconnected(address);
 }
 
 std::string netplay_socket::addr_to_str(const netplay_addr& address)
