@@ -3,10 +3,10 @@
 
 enum netplay_packet_flags
 {
-	NETPLAY_HANDSHAKE =     1 << 0, // client->server handshake
-	NETPLAY_INITIAL_SYNC =  1 << 1, // packet contains initial sync data
-	NETPLAY_SYNC_COMPLETE = 1 << 2, // sent by the client when caught up to the server
-	NETPLAY_INPUT =         1 << 3  // packet contains player inputs
+	NETPLAY_HANDSHAKE = 1 << 0, // client->server handshake
+	NETPLAY_SYNC      = 1 << 1, // packet contains sync data
+	NETPLAY_SYNC_ACK  = 1 << 2, // sync acknowledgement
+	NETPLAY_GOT_INPUT = 1 << 3, // packet contains player inputs
 };
 
 struct netplay_handshake
@@ -28,20 +28,25 @@ struct netplay_handshake
 
 struct netplay_sync
 {
-	attotime m_sync_time; // machine time at which the sync occurred
-	int m_generation;     // sync generation
+	attotime m_sync_time;             // machine time at which the sync occurred
+	unsigned long long m_frame_count; // frame count at sync
+	int m_generation;                 // sync generation
 	
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
 	{
+		writer.header('S', 'Y', 'N', 'C');
 		writer.write(m_sync_time);
+		writer.write(m_frame_count);
 		writer.write(m_generation);
 	}
 
 	template <typename StreamReader>
 	void deserialize(StreamReader& reader)
 	{
+		reader.header('S', 'Y', 'N', 'C');
 		reader.read(m_sync_time);
+		reader.read(m_frame_count);
 		reader.read(m_generation);
 	}
 };

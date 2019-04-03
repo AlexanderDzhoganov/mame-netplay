@@ -71,23 +71,19 @@ struct netplay_input_port
 struct netplay_input
 {
 	attotime m_timestamp;
+	unsigned long long m_frame_index; // the frame index to which this input applies
 	std::vector<netplay_input_port> m_ports;
 
-	// non-serialized
-	bool m_consumed;
-
 	netplay_input() {}
-	netplay_input(const attotime& timestamp);
+	netplay_input(const attotime& timestamp, unsigned long long frame_index);
 	netplay_input_port& add_input_port(int defvalue, int digital);
-	attotime calculate_future_time(int latency_ms) const; // when this input state is supposed to take effect
-	bool consumed() const { return m_consumed; }
-	void set_consumed(bool consumed) { m_consumed = consumed; }
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer)
 	{
 		writer.header('I', 'N', 'P', 'T');
 		writer.write(m_timestamp);
+		writer.write(m_frame_index);
 		writer.write((unsigned int)m_ports.size());
 
 		for(auto& port : m_ports)
@@ -101,6 +97,7 @@ struct netplay_input
 	{
 		reader.header('I', 'N', 'P', 'T');
 		reader.read(m_timestamp);
+		reader.read(m_frame_index);
 
 		unsigned int num_ports;
 		reader.read(num_ports);

@@ -5,14 +5,14 @@
 // netplay_memory
 //-------------------------------------------------
 
-netplay_memory::netplay_memory
-(
-	unsigned int index,
-	const std::string& name,
-	size_t size
-) :
-	m_size(size), m_index(index), m_name(name), m_data(nullptr),
-	m_owns_memory(true), m_generation(0), m_dirty(false)
+netplay_memory::netplay_memory(unsigned int index, const std::string& name, size_t size) :
+	m_size(size),
+	m_index(index),
+	m_name(name),
+	m_data(nullptr),
+	m_owns_memory(true),
+	m_generation(0),
+	m_dirty(false)
 {
 	netplay_assert(size > 0);
 	m_data = new char[size];
@@ -25,8 +25,13 @@ netplay_memory::netplay_memory
 	void* data,
 	size_t size
 ) :
-	m_size(size), m_index(index), m_name(name), m_data((char*)data),
-	m_owns_memory(false), m_generation(0), m_dirty(false)
+	m_size(size),
+	m_index(index),
+	m_name(name),
+	m_data((char*)data),
+	m_owns_memory(false),
+	m_generation(0),
+	m_dirty(false)
 {
 	netplay_assert(data != nullptr);
 	netplay_assert(size > 0);

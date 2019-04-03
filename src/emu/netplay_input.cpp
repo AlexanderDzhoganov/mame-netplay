@@ -14,8 +14,8 @@ netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous
 	return analog_port;
 }
 
-netplay_input::netplay_input(const attotime& timestamp) :
-	m_timestamp(timestamp), m_consumed(false) {}
+netplay_input::netplay_input(const attotime& timestamp, unsigned long long frame_index) :
+	m_timestamp(timestamp), m_frame_index(frame_index) {}
 
 netplay_input_port& netplay_input::add_input_port(int defvalue, int digital)
 {
@@ -24,11 +24,4 @@ netplay_input_port& netplay_input::add_input_port(int defvalue, int digital)
 	input_port.m_defvalue = defvalue;
 	input_port.m_digital = digital;
 	return input_port;
-}
-
-// returns when this input state is supposed to take effect
-attotime netplay_input::calculate_future_time(int latency_ms) const
-{
-	latency_ms = std::max(40, std::min(500, latency_ms));
-	return m_timestamp + attotime(0, ATTOSECONDS_PER_MILLISECOND * latency_ms);
 }

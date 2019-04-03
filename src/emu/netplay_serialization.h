@@ -8,6 +8,7 @@ public:
 	netplay_stream_writer(Stream& stream) : m_stream(stream) {}
 
 	void header(char a, char b, char c, char d) { write(a); write(b); write(c); write(d); }
+	void write(bool value) { write(value ? (char)1 : (char)0); }
 	void write(const std::string& value);
 	void write(const attotime& value) { write(value.m_seconds); write(value.m_attoseconds); }
 	void write(void* data, size_t size) { m_stream.write(data, size); }
@@ -26,6 +27,7 @@ public:
 	netplay_stream_reader(Stream& stream) : m_stream(stream) {}
 
 	void header(char a, char b, char c, char d);
+	void read(bool& value) { char c; read(c); value = c == (char)1; }
 	void read(std::string& value);
 	void read(attotime& value) { read(value.m_seconds); read(value.m_attoseconds); }
 	void read(void* data, size_t size) { m_stream.read(data, size); }

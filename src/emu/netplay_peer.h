@@ -3,29 +3,31 @@
 
 class netplay_peer
 {
+	friend class netplay_manager;
+
 	DISABLE_COPYING(netplay_peer);
 
 public:
-	netplay_peer(const std::string& name, const netplay_address& address, attotime join_time, bool self = false);
+	netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self = false);
 	void add_input_state(std::unique_ptr<netplay_input> input_state);
 
-	std::vector<netplay_input*> get_inputs_before(attotime before_time);
+	netplay_input* get_inputs_for(unsigned long long frame_index);
 	void delete_inputs_before(attotime before_time);
+	int calculate_avg_latency() const;
 
 	bool self() const { return m_self; }
 	const std::string& name() const { return m_name; }
-	void set_name(const std::string& name) { m_name = name; }
 	attotime join_time() const { return m_join_time; }
-	void set_join_time(const attotime& join_time) { m_join_time = join_time; }
-	const netplay_address& address() const { return m_address; }
+	const netplay_addr& address() const { return m_address; }
 	const std::list<std::shared_ptr<netplay_input>>& inputs() const { return m_inputs; }
 
-private:
-	bool m_self; // peer is this node
-	std::string m_name;
-	netplay_address m_address;
-	attotime m_join_time;
-	std::list<std::shared_ptr<netplay_input>> m_inputs;
+protected:
+	bool m_self;                                        // whether this is our peer
+	std::string m_name;                                 // the peer's self-specified name
+	netplay_addr m_address;                             // the peer's network address
+	attotime m_join_time;                               // when the peer joined
+	std::list<std::shared_ptr<netplay_input>> m_inputs; // peer input buffer
+	netplay_circular_buffer<int, 50> m_latency_history; // latency measurements for the last 50 packets
 };
 
 #endif

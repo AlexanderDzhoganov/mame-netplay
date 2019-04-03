@@ -17,20 +17,20 @@ class netplay_socket
 {
 public:
 	netplay_socket(netplay_manager& manager);
-	netplay_address get_self_address() const;
+	netplay_addr get_self_address() const;
 
 	netplay_status listen(const netplay_listen_socket& listen_opts);
-	netplay_status connect(const netplay_address& address);
-	void disconnect(const netplay_address& address);
+	netplay_status connect(const netplay_addr& address);
+	void disconnect(const netplay_addr& address);
 
-	void send(netplay_socket_stream& stream, const netplay_address& address);
-	bool receive(netplay_socket_stream& stream, netplay_address& address);
+	void send(netplay_socket_stream& stream, const netplay_addr& address);
+	bool receive(netplay_socket_stream& stream, netplay_addr& address);
 
-	bool socket_connected(const netplay_address& address) { return m_manager.socket_connected(address); }
-	void socket_disconnected(const netplay_address& address) { m_manager.socket_disconnected(address); }
+	bool socket_connected(const netplay_addr& address) { return m_manager.socket_connected(address); }
+	void socket_disconnected(const netplay_addr& address) { m_manager.socket_disconnected(address); }
 
-	static std::string addr_to_str(const netplay_address& address);
-	static netplay_address str_to_addr(const std::string& address);
+	static std::string addr_to_str(const netplay_addr& address);
+	static netplay_addr str_to_addr(const std::string& address);
 	
 	netplay_manager& manager() { return m_manager; }
 

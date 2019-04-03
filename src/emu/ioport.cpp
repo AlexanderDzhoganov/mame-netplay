@@ -98,8 +98,12 @@
 #include "ui/uimain.h"
 #include "inputdev.h"
 #include "natkeyboard.h"
+
+#ifndef NO_NETPLAY
+#include "netplay_util.h"
 #include "netplay_input.h"
 #include "netplay_peer.h"
+#endif
 
 #include "osdepend.h"
 
@@ -1673,7 +1677,6 @@ ioport_manager::ioport_manager(running_machine &machine)
 		m_safe_to_read(false),
 		m_last_frame_time(attotime::zero),
 		m_last_delta_nsec(0),
-		m_netplay_last_time(attotime::zero),
 		m_record_file(machine.options().input_directory(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS),
 		m_playback_file(machine.options().input_directory(), OPEN_FLAG_READ),
 		m_playback_accumulated_speed(0),
@@ -2032,22 +2035,6 @@ void ioport_manager::frame_update_callback()
 void ioport_manager::frame_update()
 {
 g_profiler.start(PROFILER_INPUT);
-
-	if (machine().netplay_active())
-	{
-		// during netplay throttle input updates
-		auto& netplay = machine().netplay();
-		auto machine_time = netplay.machine_time();
-		auto update_freq = attotime(0, ATTOSECONDS_PER_MILLISECOND * netplay.input_freq_ms());
-
-		if (m_netplay_last_time + update_freq > machine_time)
-		{
-			return;
-		}
-
-		m_netplay_last_time = machine_time;
-	}
-
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
 
@@ -2073,9 +2060,9 @@ g_profiler.start(PROFILER_INPUT);
 	for (auto &port : m_portlist)
 		port.second->update_defvalue(false);
 
-	std::unique_ptr<netplay_input> net_state;
+	std::unique_ptr<netplay_input> net_input;
 	if (machine().netplay_active())
-		net_state = std::make_unique<netplay_input>(machine().netplay().machine_time());
+		net_input = std::make_unique<netplay_input>(curtime, machine().netplay().frame_count());
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
@@ -2085,7 +2072,7 @@ g_profiler.start(PROFILER_INPUT);
 		if (machine().netplay_active())
 		{
 			auto& live_port = port.second->live();
-			auto& net_port = net_state->add_input_port(live_port.defvalue, live_port.digital);
+			auto& net_port = net_input->add_input_port(live_port.defvalue, live_port.digital);
 			for (auto& analog : live_port.analoglist)
 	  	{
 				net_port.add_analog_port(analog.m_accum, analog.m_previous, analog.m_sensitivity, analog.m_reverse);
@@ -2105,35 +2092,42 @@ g_profiler.start(PROFILER_INPUT);
 	if (machine().netplay_active())
 	{
 		auto& netplay = machine().netplay();
-		netplay.add_input_state(std::move(net_state));
-
 		auto& peers = netplay.peers();
-		auto machine_time = netplay.machine_time();
+		auto frame_index = netplay.frame_count();
 
 		for (auto& peer : peers)
 		{
 			// get all inputs from this peer before the current machine time
-			auto inputs = peer->get_inputs_before(machine_time);
+			netplay_input* inputs = nullptr;
+
+			if (peer->self())
+			{
+				// if the peer is us then we already have the inputs
+				inputs = net_input.get();
+			}
+			else
+			{
+				inputs = peer->get_inputs_for(frame_index);
+			}
+
+			if (inputs == nullptr)
+			{
+				continue; // NETPLAY TODO: predict using old inputs
+			}
 
 			// merge the inputs with the emulator ones
 			auto port_index = 0u;
 			for (auto &port : m_portlist)
 			{
-				for (auto& state : inputs)
-				{
-					auto& input_port = state->m_ports[port_index];
-					netplay_update_ports(port.second->live(), input_port);
-				}
+				auto& input_port = inputs->m_ports[port_index];
+				netplay_update_ports(port.second->live(), input_port);
 
 				port_index++;
 			}
-			
-			// set all inputs as consumed so we don't replay them
-			for (auto& state : inputs)
-			{
-				state->set_consumed(true);
-			}
 		}
+
+		// finally submit my input state for sending
+		netplay.add_input_state(std::move(net_input));
 	}
 
 	// loop over all input ports

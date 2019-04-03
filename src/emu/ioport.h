@@ -1473,7 +1473,6 @@ private:
 	// frame time tracking
 	attotime                m_last_frame_time;      // time of the last frame callback
 	attoseconds_t           m_last_delta_nsec;      // nanoseconds that passed since the previous callback
-	attotime                m_netplay_last_time; // time of last netplay inputs update
 
 	// playback/record information
 	emu_file                m_record_file;          // recording file (nullptr if not recording)

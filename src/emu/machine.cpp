@@ -82,11 +82,16 @@
 #include "dirtc.h"
 #include "image.h"
 #include "network.h"
+
+#ifndef NO_NETPLAY
+#include "netplay_util.h"
 #include "netplay_memory.h"
 #include "netplay_serialization.h"
 #include "netplay_socket.h"
 #include "netplay_input.h"
 #include "netplay_peer.h"
+#endif
+
 #include "romload.h"
 #include "ui/uimain.h"
 #include <time.h>
@@ -96,8 +101,6 @@
 #if defined(EMSCRIPTEN)
 #include <emscripten.h>
 #endif
-
-
 
 //**************************************************************************
 //  RUNNING MACHINE
@@ -213,6 +216,8 @@ void running_machine::start()
 	m_video = std::make_unique<video_manager>(*this);
 	m_ui = manager().create_ui(*this);
 
+#ifndef NO_NETPLAY
+
 	// initialize netplay
 	m_netplay = std::make_unique<netplay_manager>(*this);
 	if (options().netplay())
@@ -222,6 +227,8 @@ void running_machine::start()
 
 		m_netplay_active = true;
 	}
+
+#endif
 
 	// initialize the base time (needed for doing record/playback)
 	::time(&m_base_time);
@@ -1385,10 +1392,10 @@ void running_machine::emscripten_main_loop()
 
 	g_profiler.start(PROFILER_EXTRA);
 
-	attotime time_before = machine->time();
+	bool netplay_enabled = machine->options().netplay();
 
-	// execute CPUs if not paused
-	if (!machine->m_paused)
+	// execute CPUs if not paused and if netplay is off
+	if (!machine->m_paused && !netplay_enabled)
 	{
 		device_scheduler * scheduler;
 		scheduler = &(machine->scheduler());
@@ -1409,19 +1416,15 @@ void running_machine::emscripten_main_loop()
 			}
 		}
 	}
-	// otherwise, just pump video updates through
-	else
-		machine->m_video->frame_update();
-
-	attotime time_after = machine->time();
-
-	if (machine->netplay_active())
+	else if (netplay_enabled)
 	{
-		auto& netplay = machine->netplay();
-		attotime machine_time = netplay.machine_time();
-		machine_time += (time_after - time_before);
-		netplay.set_machine_time(machine_time);
-		netplay.update();
+		// if netplay is on then it has control over the scheduler
+		machine->netplay().update();
+	}
+	else
+	{
+		// otherwise, just pump video updates through
+		machine->m_video->frame_update();
 	}
 
 	// cancel the emscripten loop if the system has been told to exit

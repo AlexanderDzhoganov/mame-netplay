@@ -5,6 +5,11 @@
 #include "emuopts.h"
 #include "logmacro.h"
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
+#include "netplay_util.h"
 #include "netplay_memory.h"
 #include "netplay_input.h"
 #include "netplay_serialization.h"
@@ -12,10 +17,10 @@
 #include "netplay_peer.h"
 #include "netplay_socket.h"
 
-#define BEGIN_PACKET(FLAGS)                            \
-	netplay_socket_stream stream;                        \
-	netplay_socket_writer writer(stream);                \
-	netplay_packet_write(writer, m_machine_time, FLAGS);
+#define BEGIN_PACKET(FLAGS)                         \
+	netplay_socket_stream stream;                     \
+	netplay_socket_writer writer(stream);             \
+	netplay_packet_write(writer, system_time(), FLAGS);
 
 #define END_PACKET(ADDR) do { m_socket->send(stream, ADDR); } while(0);
 
@@ -23,24 +28,26 @@
 // netplay_manager
 //-------------------------------------------------
 
-netplay_manager::netplay_manager(running_machine& machine) : 
-	 m_machine(machine), m_initialized(false),
-	 m_sync_generation(0), m_sync_time(1, 0), m_catching_up(false)
-{
-	// these defaults can get overidden by config options
+const attotime netplay_frametime(0, HZ_TO_ATTOSECONDS(60));
 
+netplay_manager::netplay_manager(running_machine& machine) : 
+	 m_machine(machine),
+	 m_initialized(false),
+	 m_sync_generation(0),
+	 m_sync_time(1, 0),
+	 m_last_system_time(0, 0),
+	 m_machine_time(0, 0),
+	 m_frame_count(0),
+	 m_catching_up(false),
+	 m_waiting_for_client(false)
+{
 	auto host_address = m_machine.options().netplay_host();
 
-	// common
-	m_debug = true;                                 // netplay debug printing
-	m_host = strlen(host_address) == 0;          // is this node the host
-	m_max_block_size = 1024 * 1024;                 // 1 mb max block size
-	m_input_freq_ms = 20;                           // 20ms input poll frequency
-
-	// server only
-	m_sync_every = 10;                              // sync every 10 seconds
-
-	// client only
+	// configuration options
+	m_debug = true;                     // netplay debug printing
+	m_host = strlen(host_address) == 0; // is this node the host
+	m_max_block_size = 512 * 1024;      // 512kb max block size
+	m_sync_every = attotime(20, 0);     // sync every 1 second
 }
 
 bool netplay_manager::initialize()
@@ -63,9 +70,9 @@ bool netplay_manager::initialize()
 		}
 	}
 	else
-	{ 
+	{
 		auto host_string = m_machine.options().netplay_host();
-		netplay_address address = netplay_socket::str_to_addr(host_string);
+		netplay_addr address = netplay_socket::str_to_addr(host_string);
 		if (m_socket->connect(address) != NETPLAY_NO_ERR)
 		{
 			NETPLAY_LOG("socket failed to connect");
@@ -92,10 +99,48 @@ void netplay_manager::update()
 {
 	netplay_assert(m_initialized);
 
+	if (machine().scheduled_event_pending())
+	{
+		return;
+	}
+
+	auto sys_time = system_time();
+
+	static bool first_update = true;
+	if (first_update)
+	{
+		m_last_system_time = sys_time;
+		first_update = false;
+	}
+
+	auto target_emu_time = machine().time() + netplay_frametime;
+
+	auto can_make_progress = true;
+	if (m_waiting_for_client || machine().paused())
+		can_make_progress = false;
+
+	if (can_make_progress)
+	{
+		while (machine().time() < target_emu_time)
+		{
+			machine().scheduler().timeslice();
+		}
+
+		m_frame_count++;
+		m_machine_time += netplay_frametime;
+	}
+
 	if (m_machine_time.seconds() < 1)
 	{
 		// still in early startup phase, don't do anything
 		return;
+	}
+
+	auto can_save = machine().scheduler().can_save();
+	if (can_save && m_machine_time >= m_sync_time + m_sync_every)
+	{
+		// if we're past the sync deadline store a sync point
+		store_sync();
 	}
 
 	if (m_host)
@@ -110,27 +155,27 @@ void netplay_manager::update()
 
 void netplay_manager::update_host()
 {
-	if (machine().scheduler().can_save() && m_machine_time.seconds() >= m_sync_time.seconds())
-	{
-		// if we're past the sync deadline store a sync point
-		store_sync();
-		m_sync_time += attotime(m_sync_every, 0);
-	}
-
 	netplay_socket_stream stream;
-	netplay_address sender;
+	netplay_addr sender;
 	while (m_socket->receive(stream, sender))
 	{
 		netplay_socket_reader reader(stream);
 
 		unsigned int flags;
-		attotime timestamp;
-		netplay_packet_read(reader, timestamp, flags);
+		attotime packet_time;
+		netplay_packet_read(reader, packet_time, flags);
 
 		if (flags & NETPLAY_HANDSHAKE)
 		{
 			netplay_handshake handshake;
 			handshake.deserialize(reader);
+
+			// new client joined
+			// create a new sync for them
+			if (machine().scheduler().can_save())
+			{
+				store_sync();
+			}
 
 			// create a new peer from the handshake data
 			auto peer = add_peer(handshake.m_name, sender);
@@ -139,19 +184,26 @@ void netplay_manager::update_host()
 			send_initial_sync(*peer);
 
 			// pause the machine until the sync is done
-			machine().pause();
+			m_waiting_for_client = true;
 		}
 
-		if (flags & NETPLAY_SYNC_COMPLETE)
+		if (flags & NETPLAY_SYNC_ACK)
 		{
-			machine().resume();
+			m_waiting_for_client = false;
 		}
 		
-		if (flags & NETPLAY_INPUT)
+		if (flags & NETPLAY_GOT_INPUT)
 		{
 			auto input = std::make_unique<netplay_input>();
 			input->deserialize(reader);
-			add_input_state(std::move(input));
+
+			for (auto& peer : m_peers)
+			{
+				if (peer->address() == sender)
+				{
+					peer->add_input_state(std::move(input));
+				}
+			}
 		}
 	}
 }
@@ -159,62 +211,48 @@ void netplay_manager::update_host()
 void netplay_manager::update_client()
 {
 	netplay_socket_stream stream;
-	netplay_address sender;
+	netplay_addr sender;
 	while (m_socket->receive(stream, sender))
 	{
 		netplay_socket_reader reader(stream);
 
 		// first read the packet header
 		unsigned int flags;
-		attotime sender_time;
-		netplay_packet_read(reader, sender_time, flags);
+		attotime packet_time;
+		netplay_packet_read(reader, packet_time, flags);
 
-		if (flags & NETPLAY_INPUT)
+		if (flags & NETPLAY_GOT_INPUT)
 		{
-			// update with any new inputs
 			auto input = std::make_unique<netplay_input>();
 			input->deserialize(reader);
-			add_input_state(std::move(input));
+
+			for (auto& peer : m_peers)
+			{
+				if (peer->address() == sender)
+				{
+					peer->add_input_state(std::move(input));
+				}
+			}
 		}
-		else if (flags & NETPLAY_INITIAL_SYNC)
+		else if (flags & NETPLAY_SYNC)
 		{
 			netplay_sync sync;
 			sync.deserialize(reader);
 			m_sync_generation = sync.m_generation;
 			m_sync_time = sync.m_sync_time;
-		}
+			m_frame_count = sync.m_frame_count;
 
-		// update all memory blocks if any
-		netplay_packet_copy_blocks(reader, m_sync_blocks);
+			NETPLAY_LOG("received sync %zu", m_sync_generation);
 
-		if (flags & NETPLAY_INITIAL_SYNC)
-		{
-			// this is the initial sync so this packet contains all memory blocks
-			// we can sync right now and notify the server
-
-			NETPLAY_LOG("received initial sync, restoring state");
+			// copy the memory blocks over
+			netplay_packet_copy_blocks(reader, m_sync_blocks);
 
 			// restore the machine state
 			load_sync();
 
-			// catch up to the server
-			// setting m_catching_up will disable audio and video for the timeslices we need to do
-			m_catching_up = true;
+			NETPLAY_LOG("sync finished at frame %lld and time %s", m_frame_count, m_machine_time.as_string(4));
 
-			auto catchup_time = sender_time - m_sync_time;
-			auto& scheduler = machine().scheduler();
-			auto start_time = scheduler.time();
-
-			while (scheduler.time() < start_time + catchup_time)
-			{
-				scheduler.timeslice();
-			}
-
-			m_catching_up = false;
-
-			NETPLAY_LOG("notifying server that we have synced");
-
-			BEGIN_PACKET(NETPLAY_SYNC_COMPLETE);
+			BEGIN_PACKET(NETPLAY_SYNC_ACK);
 			END_PACKET(sender);
 		}
 	}
@@ -226,17 +264,15 @@ void netplay_manager::update_client()
 
 void netplay_manager::store_sync()
 {
-	if (!machine().scheduler().can_save())
+	if (m_debug && !machine().scheduler().can_save())
 	{
 		NETPLAY_LOG("(WARNING) cannot store_sync() because scheduler().can_save() == false");
 		return;
 	}
 
-	netplay_assert(m_host); // only the host should be creating sync points
-
 	if (m_debug)
 	{
-		NETPLAY_LOG("creating new sync point %zu at time %d", m_sync_generation, m_sync_time.seconds());
+		NETPLAY_LOG("sync #%zu at %s", m_sync_generation, m_sync_time.as_string(4));
 	}
 
 	// tell devices to save their memory
@@ -283,7 +319,7 @@ void netplay_manager::store_sync()
 
 void netplay_manager::load_sync()
 {
-	if (!machine().scheduler().can_save())
+	if (m_debug && !machine().scheduler().can_save())
 	{
 		NETPLAY_LOG("(WARNING) cannot load_sync() because scheduler().can_save() == false");
 		return;
@@ -315,11 +351,16 @@ void netplay_manager::load_sync()
 
 void netplay_manager::send_initial_sync(const netplay_peer& peer)
 {
-	BEGIN_PACKET(NETPLAY_INITIAL_SYNC);
+	BEGIN_PACKET(NETPLAY_SYNC);
 		netplay_sync sync;
 		sync.m_generation = m_sync_generation;
 		sync.m_sync_time = m_sync_time;
+		sync.m_frame_count = m_frame_count;
 		sync.serialize(writer);
+
+		NETPLAY_LOG("sending initial sync");
+		NETPLAY_LOG("sync_time = %s", m_sync_time.as_string(4));
+		NETPLAY_LOG("frame_count = %lld", m_frame_count);
 
 		for (auto& block : m_sync_blocks)
 		{
@@ -328,7 +369,7 @@ void netplay_manager::send_initial_sync(const netplay_peer& peer)
 	END_PACKET(peer.address());
 }
 
-bool netplay_manager::socket_connected(const netplay_address& address)
+bool netplay_manager::socket_connected(const netplay_addr& address)
 {
 	auto addr = netplay_socket::addr_to_str(address);
 	NETPLAY_LOG("received socket connection from %s", addr.c_str());
@@ -336,14 +377,13 @@ bool netplay_manager::socket_connected(const netplay_address& address)
 	if (m_host)
 	{
 		// if we're at max capacity then reject the connection
-		// otherwise do nothing and wait for the handshake
 		return m_peers.size() < MAX_PLAYERS;
 	}
 
 	return true;
 }
 
-void netplay_manager::socket_disconnected(const netplay_address& address)
+void netplay_manager::socket_disconnected(const netplay_addr& address)
 {
 	auto addr = netplay_socket::addr_to_str(address);
 	NETPLAY_LOG("socket %s disconnected", addr.c_str());
@@ -400,11 +440,21 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 	netplay_assert(input_state != nullptr);
 	netplay_assert(!m_peers.empty());
 
+	for(auto& peer : m_peers)
+	{
+		if (peer->self())
+			continue;
+
+		/*BEGIN_PACKET(NETPLAY_GOT_INPUT)
+			input_state->serialize(writer);
+		END_PACKET(peer->address());*/
+	}
+
 	auto& self = m_peers[0]; // first peer is always this node's
 	self->add_input_state(std::move(input_state));
 }
 
-std::shared_ptr<netplay_peer> netplay_manager::add_peer(const std::string& name, const netplay_address& address, bool self)
+std::shared_ptr<netplay_peer> netplay_manager::add_peer(const std::string& name, const netplay_addr& address, bool self)
 {
 	std::shared_ptr<netplay_peer> existing_peer = nullptr;
 	for (auto it = m_peers.begin(); it != m_peers.end(); ++it)
@@ -426,8 +476,8 @@ std::shared_ptr<netplay_peer> netplay_manager::add_peer(const std::string& name,
 	}
 
 	NETPLAY_LOG("peer %s with address %s already exists, assuming reconnected", name.c_str(), address_s.c_str());
-	existing_peer->set_name(name);
-	existing_peer->set_join_time(m_machine_time);
+	existing_peer->m_name = name;
+	existing_peer->m_join_time = m_machine_time;
 	return existing_peer;
 }
 
@@ -473,4 +523,11 @@ unsigned char netplay_manager::memory_checksum(const netplay_blocklist& blocks)
 	}
 
 	return checksum;
+}
+
+attotime netplay_manager::system_time() const
+{
+#ifdef EMSCRIPTEN
+	return attotime::from_double(emscripten_get_now() * 0.001);
+#endif
 }

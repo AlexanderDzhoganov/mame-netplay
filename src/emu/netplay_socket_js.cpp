@@ -23,7 +23,7 @@ netplay_socket::netplay_socket(netplay_manager& manager) :
   netplay_socket_instance = this; // pretty hacky, there's probably a better way
 }
 
-netplay_address netplay_socket::get_self_address() const
+netplay_addr netplay_socket::get_self_address() const
 {
 	return netplay_socket::str_to_addr("dummy");
 }
@@ -34,18 +34,18 @@ netplay_status netplay_socket::listen(const netplay_listen_socket& listen_opts)
 	return NETPLAY_NO_ERR;
 }
 
-netplay_status netplay_socket::connect(const netplay_address& address)
+netplay_status netplay_socket::connect(const netplay_addr& address)
 {
 	// this is a stub because the connection is done on the js side
 	return NETPLAY_NO_ERR;
 }
 
-void netplay_socket::disconnect(const netplay_address& address)
+void netplay_socket::disconnect(const netplay_addr& address)
 {
   // NETPLAY TODO: implement this
 }
 
-void netplay_socket::send(netplay_socket_stream& stream, const netplay_address& address)
+void netplay_socket::send(netplay_socket_stream& stream, const netplay_addr& address)
 {
 	netplay_send_queue.emplace_back();
   js_packet& packet = netplay_send_queue.back();
@@ -53,7 +53,7 @@ void netplay_socket::send(netplay_socket_stream& stream, const netplay_address& 
   packet.address = netplay_socket::addr_to_str(address);
 }
 
-bool netplay_socket::receive(netplay_socket_stream& stream, netplay_address& address)
+bool netplay_socket::receive(netplay_socket_stream& stream, netplay_addr& address)
 {
 	if (netplay_recv_queue.empty())
 	{
@@ -67,14 +67,14 @@ bool netplay_socket::receive(netplay_socket_stream& stream, netplay_address& add
 	return true;
 }
 
-std::string netplay_socket::addr_to_str(const netplay_address& address)
+std::string netplay_socket::addr_to_str(const netplay_addr& address)
 { 
   return address.m_peerid;
 }
 
-netplay_address netplay_socket::str_to_addr(const std::string& address)
+netplay_addr netplay_socket::str_to_addr(const std::string& address)
 {
-  netplay_address addr;
+  netplay_addr addr;
   addr.m_peerid = address;
   return addr;
 }

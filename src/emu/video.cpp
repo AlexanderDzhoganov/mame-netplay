@@ -222,11 +222,11 @@ void video_manager::set_frameskip(int frameskip)
 
 void video_manager::frame_update(bool from_debugger)
 {
-	if (machine().netplay_active() && machine().netplay().catching_up())
+	/*if (machine().netplay_active() && machine().netplay().catching_up())
 	{
 		// if netplay is active and we're catching up then skip rendering
 		return;
-	}
+	}*/
 
 	// only render sound and video if we're in the running phase
 	machine_phase const phase = machine().phase();
@@ -242,6 +242,11 @@ void video_manager::frame_update(bool from_debugger)
 			skipped_it = true;
 		else
 			m_empty_skip_count = 0;
+	}
+
+	if (machine().netplay_active())
+	{
+		skipped_it = false; // no frameskip during netplay
 	}
 
 	// draw the user interface
