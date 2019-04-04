@@ -1,7 +1,7 @@
 // #ifdef EMSCRIPTEN
 
 #include <deque>
-#include <emscripten/emscripten.h>
+#include <emscripten.h>
 
 #include "netplay.h"
 #include "netplay/serialization.h"
@@ -14,7 +14,6 @@ struct js_packet
 };
 
 netplay_socket* netplay_socket_instance = nullptr;
-std::deque<js_packet> netplay_send_queue;
 std::deque<js_packet> netplay_recv_queue;
 
 netplay_socket::netplay_socket(netplay_manager& manager) :
@@ -47,10 +46,11 @@ void netplay_socket::disconnect(const netplay_addr& address)
 
 void netplay_socket::send(netplay_socket_stream& stream, const netplay_addr& address)
 {
-	netplay_send_queue.emplace_back();
-  js_packet& packet = netplay_send_queue.back();
-	packet.data = stream.extract_data();
-  packet.address = netplay_socket::addr_to_str(address);
+  auto& data = stream.data();
+
+  EM_ASM_ARGS({
+		jsmame_netplay_packet($0, $1, $2);
+  }, (unsigned int)data.data(), (unsigned int)data.size(), (unsigned int)address.m_peerid.c_str());
 }
 
 bool netplay_socket::receive(netplay_socket_stream& stream, netplay_addr& address)
@@ -92,34 +92,13 @@ netplay_addr netplay_socket::str_to_addr(const std::string& address)
 // javascript exports
 
 extern "C" {
-  int js_netplay_get_next(char* data, char* address)
-  {
-    if (netplay_send_queue.empty())
-    {
-      return 0;
-    }
-
-    js_packet& packet = netplay_send_queue.front();
-
-    memcpy(data, packet.data.data(), packet.data.size() * sizeof(char));
-
-    memcpy(address, packet.address.c_str(), packet.address.length());
-    address[packet.address.length()] = 0;
-
-    int length = (int)packet.data.size();
-    netplay_send_queue.pop_front();
-
-    return length;
-  }
-
   void js_netplay_enqueue(char* data, int length, char* sender)
   {
-    js_packet packet;
-
+    netplay_recv_queue.emplace_back();
+    auto& packet = netplay_recv_queue.back();
     packet.data.resize(length);
     memcpy(packet.data.data(), data, length * sizeof(char));
     packet.address = sender;
-    netplay_recv_queue.push_back(packet);
   }
 
   bool js_netplay_connect(char* address)

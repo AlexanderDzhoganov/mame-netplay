@@ -2038,19 +2038,11 @@ void ioport_manager::frame_update()
 g_profiler.start(PROFILER_INPUT);
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
+	bool netplay_active = machine().netplay_active();
 
-	if (machine().netplay_active())
+	if (netplay_active)
 	{
-		static unsigned long long last_frame_index = 0;
-		auto frame_index = machine().netplay().frame_count();
-
-		// only process inputs once per update during netplay
-		if (last_frame_index == frame_index)
-		{
-			return;
-		}
-
-		last_frame_index = frame_index;
+		machine().netplay().m_frame_count++;
 	}
 	else
 	{
@@ -2074,15 +2066,15 @@ g_profiler.start(PROFILER_INPUT);
 		port.second->update_defvalue(false);
 
 	std::unique_ptr<netplay_input> net_input;
-	if (machine().netplay_active() && !machine().netplay().catching_up())
-		net_input = std::make_unique<netplay_input>(machine().netplay().machine_time(), machine().netplay().frame_count());
+	if (netplay_active && !machine().netplay().catching_up())
+		net_input = std::make_unique<netplay_input>(machine().netplay().frame_count());
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
 	{
 		port.second->frame_update();
 
-		if (machine().netplay_active())
+		if (netplay_active)
 		{
 			auto& live_port = port.second->live();
 
@@ -2106,25 +2098,23 @@ g_profiler.start(PROFILER_INPUT);
 		}
 	}
 
-	if (machine().netplay_active())
+	if (netplay_active && machine().netplay().input_enabled())
 	{
 		auto& netplay = machine().netplay();
-		auto& peers = netplay.peers();
-		auto frame_index = netplay.frame_count();
-		auto effective_frame = frame_index - netplay.input_delay();
+		auto effective_frame = netplay.frame_count() - netplay.input_delay();
 
 		// then we'll apply remote inputs and try to predict the ones we are missing
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
-		for (auto& peer : peers)
+		for (auto& peer : netplay.peers())
 		{
 			// fetch this peer's inputs for frame (frame_index - input_delay)
 			auto inputs = peer->get_inputs_for(effective_frame);
 			if (inputs == nullptr)
 			{
-				inputs = peer->predict_input_state<netplay_repeat_last_predictor>(effective_frame);
+				inputs = peer->predict_input_state<netplay_dummy_predictor>(effective_frame);
 				if (inputs == nullptr)
 				{
-					break;
+					continue;
 				}
 			}
 
@@ -2161,7 +2151,7 @@ void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
 {
 	// read the default value and the digital state
   live_port.digital = 0;
-	live_port.defvalue = 0;
+	// live_port.defvalue = 0;
 
   // loop over analog ports and save their data
   for (auto& analog : live_port.analoglist)
@@ -2169,8 +2159,8 @@ void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
     // reset current and previous values
     analog.m_accum = 0;
     analog.m_previous = 0;
-		analog.m_sensitivity = 0;
-		analog.m_reverse = 0;
+		// analog.m_sensitivity = 0;
+		// analog.m_reverse = 0;
   }
 }
 

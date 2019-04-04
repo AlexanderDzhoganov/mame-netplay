@@ -16,10 +16,9 @@ typedef std::vector<std::shared_ptr<netplay_memory>> netplay_blocklist;
 
 struct netplay_state
 {
-	netplay_blocklist m_blocks;
-	attotime m_timestamp;
 	unsigned long long m_frame_count;
-	int m_generation;
+	attotime m_timestamp;
+	netplay_blocklist m_blocks;
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
@@ -41,11 +40,9 @@ public:
 	running_machine& machine() { return m_machine; }
 
 	bool initialized() const { return m_initialized; }
-	
 	bool catching_up() const { return m_catching_up; }
-	bool waiting_for_client() const { return m_waiting_for_client; }
+	bool input_enabled() const { return m_frame_count > m_input_delay; }
 
-	attotime machine_time() const { return m_machine_time; }
 	attotime system_time() const;
 	unsigned long long frame_count() const { return m_frame_count; }
 	unsigned int input_delay() const { return m_input_delay; }
@@ -80,25 +77,27 @@ private:
 	bool m_debug;                     // whether debug logging for netplay is enabled
 	bool m_host;                      // whether this node is the host
 	size_t m_max_block_size;          // maximum memory block size, blocks larger than this get split up
-	attotime m_sync_every;            // how often to do a memory sync
 	unsigned int m_input_delay;       // how many frames of input delay to use, higher numbers result in less rollbacks
+	unsigned int m_checksum_every;
 
 	netplay_peerlist m_peers;         // connected peers
 
 	netplay_blocklist m_memory;       // active (in-use) memory blocks by the emulator
 	netplay_statelist m_states;       // saved emulator states
 
-	attotime m_machine_time;          // current machine time
-	unsigned long long m_frame_count; // current "frame" (update) count
 	bool m_catching_up;               // are we catching up?
 	bool m_waiting_for_client;        // are we waiting on a client?
 
 	bool m_rollback;                  // are we rolling back this update?
 	unsigned long long m_rollback_frame; // where to rollback to
-	bool m_pulling_ahead;             // are we pulling ahead of the other peers?
 	bool m_initial_sync;              // (client only) whether the initial sync has completed
+	unsigned long long m_checksum_frame; // (client only) when to send the next checksum
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
+
+protected:
+	unsigned long long m_frame_count; // current "frame" (update) count
+
 };
 
 #endif

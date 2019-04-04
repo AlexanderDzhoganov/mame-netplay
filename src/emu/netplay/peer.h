@@ -1,19 +1,16 @@
 #ifndef MAME_EMU_NETPLAY_PEER_H
 #define MAME_EMU_NETPLAY_PEER_H
 
-typedef netplay_circular_buffer<std::shared_ptr<netplay_input>, 120> netplay_input_buffer;
+typedef netplay_circular_buffer<std::shared_ptr<netplay_input>, 30> netplay_input_buffer;
 
-class netplay_repeat_last_predictor
+// this is the trivial imput predictor
+// it simply repeats the previous frame inputs
+class netplay_dummy_predictor
 {
 public:
 	std::unique_ptr<netplay_input> operator() (const netplay_input_buffer& inputs, unsigned long long frame_index)
 	{
-		if (inputs.empty())
-		{
-			return nullptr;
-		}
-
-		return std::make_unique<netplay_input>(*inputs.newest());
+		return inputs.empty() ? nullptr : std::make_unique<netplay_input>(*inputs.newest());
 	}
 };
 
@@ -32,6 +29,12 @@ public:
 	{
 		Predictor predictor;
 		auto predicted = predictor(m_inputs, frame_index);
+
+		if (predicted == nullptr)
+		{
+			return nullptr;
+		}
+
 		auto predicted_ptr = predicted.get();
 		m_predicted_inputs.push_back(std::move(predicted));
 		return predicted_ptr;

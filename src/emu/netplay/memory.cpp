@@ -13,8 +13,7 @@ netplay_memory::netplay_memory(unsigned int index, const std::string& name, size
 	m_index(index),
 	m_name(name),
 	m_data(nullptr),
-	m_owns_memory(true),
-	m_generation(0)
+	m_owns_memory(true)
 {
 	netplay_assert(size > 0);
 	m_data = new char[size];
@@ -31,8 +30,7 @@ netplay_memory::netplay_memory
 	m_index(index),
 	m_name(name),
 	m_data((char*)data),
-	m_owns_memory(false),
-	m_generation(0)
+	m_owns_memory(false)
 {
 	netplay_assert(data != nullptr);
 	netplay_assert(size > 0);
@@ -51,7 +49,6 @@ void netplay_memory::copy_from(const netplay_memory& block)
 {
 	netplay_assert(m_size == block.m_size);
 	memcpy(m_data, block.m_data, m_size);
-	m_generation = block.m_generation;
 }
 
 unsigned char netplay_memory::checksum() const
@@ -82,7 +79,6 @@ std::string netplay_memory::get_debug_string()
 {
 	std::stringstream ss;
 	ss << "memory block #" << m_index << " \"" << m_name << "\" @ " << (size_t)m_data;
-	ss << " [ " << "size = " << m_size << ", gen  = " << m_generation;
-	ss << ", owns_memory = " << (m_owns_memory ? "yes" : "no") << " ]";
+	ss << " [ " << "size = " << m_size << ", owns_memory = " << (m_owns_memory ? "yes" : "no") << " ]";
 	return ss.str();
 }

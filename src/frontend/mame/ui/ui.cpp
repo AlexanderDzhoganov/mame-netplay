@@ -30,7 +30,6 @@
 #include "ui/state.h"
 #include "ui/viewgfx.h"
 #include "imagedev/cassette.h"
-#include "netplay.h"
 
 
 /***************************************************************************
@@ -395,10 +394,8 @@ void mame_ui_manager::update_and_render(render_container &container)
 	// always start clean
 	container.empty();
 
-	bool netplay_waiting = machine().netplay_active() && machine().netplay().waiting_for_client();
-
 	// if we're paused, dim the whole screen
-	if (machine().phase() >= machine_phase::RESET && (single_step() || machine().paused() || netplay_waiting))
+	if (machine().phase() >= machine_phase::RESET && (single_step() || machine().paused()))
 	{
 		int alpha = (1.0f - machine().options().pause_brightness()) * 255.0f;
 		if (ui::menu::stack_has_special_main_menu(machine()))

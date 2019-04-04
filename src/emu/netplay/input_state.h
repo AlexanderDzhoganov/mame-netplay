@@ -8,6 +8,8 @@ struct netplay_analog_port
 	int m_sensitivity;
 	bool m_reverse;
 
+	netplay_analog_port() : m_accum(0), m_previous(0), m_sensitivity(0), m_reverse(0) {}
+
 	bool operator==(const netplay_analog_port& port) const
 	{
 		// TODO FIXME: is this correct?
@@ -40,6 +42,8 @@ struct netplay_input_port
 	unsigned int m_defvalue;
 	unsigned int m_digital;
 	std::vector<netplay_analog_port> m_analog_ports;
+
+	netplay_input_port() : m_defvalue(0), m_digital(0) {}
 
 	netplay_analog_port& add_analog_port(int accum, int previous, int sensitivity, bool reverse);
 
@@ -93,14 +97,11 @@ struct netplay_input_port
 
 struct netplay_input
 {
-	attotime m_timestamp;
 	unsigned long long m_frame_index; // the frame index to which this input applies
 	std::vector<netplay_input_port> m_ports;
 	
-	// non serialized
- 
-	netplay_input() {}
-	netplay_input(const attotime& timestamp, unsigned long long frame_index);
+	netplay_input() : m_frame_index(0) {}
+	netplay_input(unsigned long long frame_index);
 	netplay_input_port& add_input_port(int defvalue, int digital);
 
 	bool operator==(const netplay_input& input) const
@@ -125,7 +126,6 @@ struct netplay_input
 	void serialize(StreamWriter& writer)
 	{
 		writer.header('I', 'N', 'P', 'T');
-		writer.write(m_timestamp);
 		writer.write(m_frame_index);
 		writer.write((unsigned int)m_ports.size());
 
@@ -139,7 +139,6 @@ struct netplay_input
 	void deserialize(StreamReader& reader)
 	{
 		reader.header('I', 'N', 'P', 'T');
-		reader.read(m_timestamp);
 		reader.read(m_frame_index);
 
 		unsigned int num_ports;

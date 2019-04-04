@@ -11,15 +11,13 @@ public:
 	~netplay_memory();
 
 	void copy_from(const netplay_memory& block);
-	void copy_from(void* data, size_t size, int generation);
+	void copy_from(void* data, size_t size);
 
 	unsigned int index() const { return m_index; }
-	const std::string& get_name() const { return m_name; }
+	const std::string& name() const { return m_name; }
 	void* data() const { return m_data; }
 	size_t size() const { return m_size; }
 	bool owns_memory() const { return m_owns_memory; }
-	int generation() const { return m_generation; }
-	void set_generation(int generation) { m_generation = generation; }
 	std::string get_debug_string();
 	
 	unsigned char checksum() const;
@@ -31,7 +29,6 @@ private:
 	std::string m_name;
 	char* m_data;
 	bool m_owns_memory;
-	int m_generation;
 };
 
 #endif

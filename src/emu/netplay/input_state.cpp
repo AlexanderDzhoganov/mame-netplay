@@ -15,8 +15,7 @@ netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous
 	return analog_port;
 }
 
-netplay_input::netplay_input(const attotime& timestamp, unsigned long long frame_index) :
-	m_timestamp(timestamp), m_frame_index(frame_index) {}
+netplay_input::netplay_input(unsigned long long frame_index) : m_frame_index(frame_index) {}
 
 netplay_input_port& netplay_input::add_input_port(int defvalue, int digital)
 {

@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define NETPLAY_LOG(...) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+#define NETPLAY_LOG(...) { printf(__VA_ARGS__); printf("\n"); }
 
 #ifndef NO_NETPLAY_ASSERT
 #define netplay_assert(COND) do { \

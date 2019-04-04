@@ -114,6 +114,7 @@ class device_scheduler
 {
 	friend class device_execute_interface;
 	friend class emu_timer;
+	friend class netplay_manager;
 
 public:
 	// construction/destruction
@@ -149,6 +150,9 @@ public:
 
 	// for emergencies only!
 	void eat_all_cycles();
+
+protected:
+	void set_basetime(const attotime& basetime) { m_basetime = basetime; }
 
 private:
 	// callbacks

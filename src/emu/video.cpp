@@ -204,17 +204,15 @@ void video_manager::set_frameskip(int frameskip)
 		m_auto_frameskip = false;
 		m_frameskip_level = 0;
 	}
-
-	// -1 means autoframeskip
 	else if (frameskip == -1)
 	{
+		// -1 means autoframeskip
 		m_auto_frameskip = true;
 		m_frameskip_level = 0;
 	}
-
-	// any other level is a direct control
 	else if (frameskip >= 0 && frameskip <= MAX_FRAMESKIP)
 	{
+		// any other level is a direct control
 		m_auto_frameskip = false;
 		m_frameskip_level = frameskip;
 	}
@@ -245,14 +243,12 @@ void video_manager::frame_update(bool from_debugger)
 			m_empty_skip_count = 0;
 	}
 
-	if (machine().netplay_active() && machine().netplay().catching_up())
-		skipped_it = true;
-
 	// draw the user interface
 	emulator_info::draw_user_interface(machine());
 
 	// if we're throttling, synchronize before rendering
 	attotime current_time = machine().time();
+
 	if (!from_debugger && !skipped_it && effective_throttle())
 		update_throttle(current_time);
 
