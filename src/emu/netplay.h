@@ -55,6 +55,7 @@ protected:
 	// called by the socket implementation
 	bool socket_connected(const netplay_addr& address);
 	void socket_disconnected(const netplay_addr& address);
+	void socket_data(netplay_socket_reader& reader, const netplay_addr& sender);
 
 	// methods called by save_manager
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
@@ -64,14 +65,14 @@ protected:
 	void next_frame() { m_frame_count++; }
 
 private:
-	void update_host();
-	void update_client();
 	void recalculate_input_delay();
+	void set_input_delay(unsigned int input_delay);
 	bool store_state();
 	void load_state(const netplay_state& state);
 	bool rollback(netplay_frame before_frame);
 	void send_full_sync(const netplay_peer& peer);
-	void send_checksum(const netplay_peer& peer);
+	void handle_host_packet(netplay_socket_reader& reader, const netplay_addr& sender);
+	void handle_client_packet(netplay_socket_reader& reader, const netplay_addr& sender);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
 	void handle_input(std::unique_ptr<netplay_input> input_state, netplay_peer& peer);
 	void handle_checksum(std::unique_ptr<netplay_checksum> checksum, netplay_peer& peer);

@@ -52,12 +52,27 @@ public:
 	bool eof() const { return m_cursor >= m_data.size(); }
 	size_t size() const { return m_data.size(); }
 
-	void set_data(std::vector<char> data) { m_data = std::move(data); m_cursor = 0; }
 	const std::vector<char>& data() { return m_data; }
-	std::vector<char> extract_data() { return std::move(m_data); }
 
 private:
 	std::vector<char> m_data;
+	size_t m_cursor;
+};
+
+class netplay_raw_byte_stream
+{
+public:
+	netplay_raw_byte_stream(const char* data, size_t size) :
+		m_data(data), m_size(size), m_cursor(0) {}
+
+	void read(void* data, size_t size);
+
+	bool eof() const { return m_cursor >= m_size; }
+	size_t size() const { return m_size; }
+
+private:
+	const char* m_data;
+	size_t m_size;
 	size_t m_cursor;
 };
 
