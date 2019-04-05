@@ -2042,7 +2042,7 @@ g_profiler.start(PROFILER_INPUT);
 
 	if (netplay_active)
 	{
-		machine().netplay().m_frame_count++;
+		machine().netplay().next_frame();
 	}
 	else
 	{

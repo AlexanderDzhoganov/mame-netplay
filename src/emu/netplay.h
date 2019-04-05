@@ -7,16 +7,22 @@
 #include "netplay/serialization.h"
 #include "netplay/socket.h"
 
+#define NETPLAY_ROLLBACK_HISTORY_SIZE 600
+#define NETPLAY_MIN_INPUT_DELAY 3u
+#define NETPLAY_MAX_INPUT_DELAY 20u
+
 class netplay_memory;
 class netplay_peer;
 struct netplay_input;
 struct netplay_sync;
+struct netplay_checksum;
 
 typedef std::vector<std::shared_ptr<netplay_memory>> netplay_blocklist;
+typedef unsigned long long netplay_frame;
 
 struct netplay_state
 {
-	unsigned long long m_frame_count;
+	netplay_frame m_frame_count;
 	attotime m_timestamp;
 	netplay_blocklist m_blocks;
 };
@@ -44,7 +50,7 @@ public:
 	bool input_enabled() const { return m_frame_count > m_input_delay; }
 
 	attotime system_time() const;
-	unsigned long long frame_count() const { return m_frame_count; }
+	netplay_frame frame_count() const { return m_frame_count; }
 	unsigned int input_delay() const { return m_input_delay; }
 	const netplay_peerlist& peers() const { return m_peers; }
 
@@ -54,20 +60,25 @@ protected:
 	void socket_disconnected(const netplay_addr& address);
 
 	// methods called by save_manager
-	void create_memory_block(const std::string& name, void* data_ptr, size_t size);
+	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
 
 	// methods called by ioport_manager
 	void add_input_state(std::unique_ptr<netplay_input> input_state);
+	void next_frame() { m_frame_count++; }
 
 private:
 	void update_host();
 	void update_client();
+	void recalculate_input_delay();
 	bool store_state();
 	void load_state(const netplay_state& state);
-	bool rollback(unsigned long long before_frame);
+	bool rollback(netplay_frame before_frame);
 	void send_full_sync(const netplay_peer& peer);
+	void send_checksum(const netplay_peer& peer);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
 	void handle_input(std::unique_ptr<netplay_input> input_state, netplay_peer& peer);
+	void handle_checksum(std::unique_ptr<netplay_checksum> checksum, netplay_peer& peer);
+
 	netplay_peer& add_peer(const std::string& name, const netplay_addr& address, bool self = false);
 	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
 
@@ -78,7 +89,8 @@ private:
 	bool m_host;                      // whether this node is the host
 	size_t m_max_block_size;          // maximum memory block size, blocks larger than this get split up
 	unsigned int m_input_delay;       // how many frames of input delay to use, higher numbers result in less rollbacks
-	unsigned int m_checksum_every;
+	unsigned int m_checksum_every;    // how often to send checksum checks
+	unsigned int m_max_rollback;      // maximum number of frames we're allowed to rollback
 
 	netplay_peerlist m_peers;         // connected peers
 
@@ -88,16 +100,16 @@ private:
 	bool m_catching_up;               // are we catching up?
 	bool m_waiting_for_client;        // are we waiting on a client?
 
-	bool m_rollback;                  // are we rolling back this update?
-	unsigned long long m_rollback_frame; // where to rollback to
 	bool m_initial_sync;              // (client only) whether the initial sync has completed
-	unsigned long long m_checksum_frame; // (client only) when to send the next checksum
+	bool m_rollback;                  // are we rolling back this update?
+	netplay_frame m_rollback_frame;   // where to rollback to
+	netplay_frame m_checksum_frame;   // (client only) when to send the next checksum
+	netplay_frame m_frame_count;      // current "frame" (update) count
 
+	std::unique_ptr<netplay_checksum> m_pending_checksum;
+
+	netplay_circular_buffer<netplay_frame, NETPLAY_ROLLBACK_HISTORY_SIZE> m_rollback_history;
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
-
-protected:
-	unsigned long long m_frame_count; // current "frame" (update) count
-
 };
 
 #endif

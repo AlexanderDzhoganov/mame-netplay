@@ -3,14 +3,23 @@
 
 #include "netplay.h"
 #include "netplay/memory.h"
+#include "netplay/fnv.h"
 
 //-------------------------------------------------
 // netplay_memory
 //-------------------------------------------------
 
-netplay_memory::netplay_memory(unsigned int index, const std::string& name, size_t size) :
+netplay_memory::netplay_memory
+(
+	unsigned int index,
+	const std::string& module_name,
+	const std::string& name,
+	size_t size
+) :
 	m_size(size),
 	m_index(index),
+	m_module_hash(fnv1a(module_name)),
+	m_module_name(name),
 	m_name(name),
 	m_data(nullptr),
 	m_owns_memory(true)
@@ -22,12 +31,15 @@ netplay_memory::netplay_memory(unsigned int index, const std::string& name, size
 netplay_memory::netplay_memory
 (
 	unsigned int index,
+	const std::string& module_name,
 	const std::string& name,
 	void* data,
 	size_t size
 ) :
 	m_size(size),
 	m_index(index),
+	m_module_hash(fnv1a(module_name)),
+	m_module_name(name),
 	m_name(name),
 	m_data((char*)data),
 	m_owns_memory(false)

@@ -91,6 +91,7 @@
 #include "netplay/socket.h"
 #include "netplay/input_state.h"
 #include "netplay/peer.h"
+#include "netplay/packet.h"
 #endif
 
 #include "romload.h"

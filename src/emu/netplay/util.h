@@ -37,6 +37,7 @@ public:
 	size_t size() const { return m_buffer.size(); }
 	size_t capacity() const { return N; }
 	const std::vector<T>& items() const { return m_buffer; }
+	void clear() { m_buffer.clear(); m_cursor =0; }
 
 	T& newest()
 	{

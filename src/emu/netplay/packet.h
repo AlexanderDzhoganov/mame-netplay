@@ -8,6 +8,7 @@ enum netplay_packet_flags
 	NETPLAY_SYNC_ACK   = 1 << 2, // sync acknowledgement
 	NETPLAY_INPUTS     = 1 << 4, // packet contains player inputs
 	NETPLAY_CHECKSUM   = 1 << 5, // memory checksum
+	NETPLAY_SET_DELAY  = 1 << 6  // set a new input delay
 };
 
 struct netplay_handshake
@@ -31,6 +32,7 @@ struct netplay_sync
 {
 	attotime m_sync_time;             // machine time at which the sync occurred
 	unsigned long long m_frame_count; // frame count at sync
+	unsigned int m_input_delay;       // current input delay value
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
@@ -38,6 +40,7 @@ struct netplay_sync
 		writer.header('S', 'Y', 'N', 'C');
 		writer.write(m_sync_time);
 		writer.write(m_frame_count);
+		writer.write(m_input_delay);
 	}
 
 	template <typename StreamReader>
@@ -46,6 +49,7 @@ struct netplay_sync
 		reader.header('S', 'Y', 'N', 'C');
 		reader.read(m_sync_time);
 		reader.read(m_frame_count);
+		reader.read(m_input_delay);
 	}
 };
 
@@ -53,6 +57,8 @@ struct netplay_checksum
 {
 	unsigned long long m_frame_count;       // frame index of the latest state
 	std::vector<unsigned char> m_checksums; // block checksums
+
+	netplay_checksum() : m_frame_count(0) {}
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const

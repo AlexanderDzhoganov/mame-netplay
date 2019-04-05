@@ -188,7 +188,7 @@ void save_manager::save_memory(device_t *device, const char *module, const char 
 
 	if (machine().netplay_active())
 	{
-		machine().netplay().create_memory_block(totalname, val, valsize * valcount);
+		machine().netplay().create_memory_block(module, totalname, val, valsize * valcount);
 	}
 }
 
