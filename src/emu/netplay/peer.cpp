@@ -17,7 +17,7 @@ void netplay_peer::add_input_state(std::unique_ptr<netplay_input> input_state)
 	m_inputs.push_back(std::move(input_state));
 }
 
-netplay_input* netplay_peer::get_inputs_for(unsigned long long frame_index)
+netplay_input* netplay_peer::get_inputs_for(netplay_frame frame_index)
 {
 	for (auto& input : m_inputs)
 	{
@@ -30,7 +30,7 @@ netplay_input* netplay_peer::get_inputs_for(unsigned long long frame_index)
 	return nullptr;
 }
 
-netplay_input* netplay_peer::get_predicted_inputs_for(unsigned long long frame_index)
+netplay_input* netplay_peer::get_predicted_inputs_for(netplay_frame frame_index)
 {
 	for (auto& input : m_predicted_inputs)
 	{
@@ -47,11 +47,23 @@ double netplay_peer::average_latency()
 {
 	double avg_latency = 0.0;
 
-	for (auto& measurement : m_ping_history)
+	for (auto& latency : m_ping_history)
 	{
-		avg_latency += measurement;
+		avg_latency += latency;
 	}
 
 	avg_latency /= (double)m_ping_history.size();
 	return avg_latency;
+}
+
+double netplay_peer::highest_latency()
+{
+	double highest_latency = 0.0;
+
+	for (auto& latency : m_ping_history)
+	{
+		highest_latency = std::max(latency, highest_latency);
+	}
+
+	return highest_latency;
 }

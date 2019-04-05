@@ -3,17 +3,14 @@
 
 struct netplay_analog_port
 {
-	int m_accum;
-	int m_previous;
-	int m_sensitivity;
-	bool m_reverse;
+	unsigned int m_accum;
+	unsigned int m_previous;
 
-	netplay_analog_port() : m_accum(0), m_previous(0), m_sensitivity(0), m_reverse(0) {}
+	netplay_analog_port() : m_accum(0), m_previous(0) {}
 
 	bool operator==(const netplay_analog_port& port) const
 	{
-		// TODO FIXME: is this correct?
-		return memcmp(this, &port, sizeof(netplay_analog_port)) == 0;
+		return m_accum == port.m_accum && m_previous == port.m_previous;
 	}
 
 	bool operator!=(const netplay_analog_port& port) const { return !(port == *this); }
@@ -23,8 +20,6 @@ struct netplay_analog_port
 	{
 		writer.write(m_accum);
 		writer.write(m_previous);
-		writer.write(m_sensitivity);
-		writer.write(m_reverse);
 	}
 
 	template <typename StreamReader>
@@ -32,20 +27,17 @@ struct netplay_analog_port
 	{
 		reader.read(m_accum);
 		reader.read(m_previous);
-		reader.read(m_sensitivity);
-		reader.read(m_reverse);
 	}
 };
 
 struct netplay_input_port
 {
-	unsigned int m_defvalue;
 	unsigned int m_digital;
 	std::vector<netplay_analog_port> m_analog_ports;
 
-	netplay_input_port() : m_defvalue(0), m_digital(0) {}
+	netplay_input_port() : m_digital(0) {}
 
-	netplay_analog_port& add_analog_port(int accum, int previous, int sensitivity, bool reverse);
+	netplay_analog_port& add_analog_port(int accum, int previous);
 
 	bool operator==(const netplay_input_port& port) const
 	{
@@ -60,7 +52,7 @@ struct netplay_input_port
 			}
 		}
 
-		return m_defvalue == port.m_defvalue && m_digital == port.m_digital;
+		return m_digital == port.m_digital;
 	}
 
 	bool operator!=(const netplay_input_port& port) const { return !(port == *this); };
@@ -68,10 +60,11 @@ struct netplay_input_port
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer)
 	{
-		writer.write(m_defvalue);
 		writer.write(m_digital);
 
-		writer.write((unsigned int)m_analog_ports.size());
+		netplay_assert(m_analog_ports.size() <= 255);
+		writer.write((unsigned char)m_analog_ports.size());
+
 		for(auto& analog_port : m_analog_ports)
 		{
 			analog_port.serialize(writer);
@@ -81,10 +74,9 @@ struct netplay_input_port
 	template <typename StreamReader>
 	void deserialize(StreamReader& reader)
 	{
-		reader.read(m_defvalue);
 		reader.read(m_digital);
 
-		unsigned int num_analog_ports;
+		unsigned char num_analog_ports;
 		reader.read(num_analog_ports);
 		m_analog_ports.resize(num_analog_ports);
 
@@ -97,12 +89,12 @@ struct netplay_input_port
 
 struct netplay_input
 {
-	unsigned long long m_frame_index; // the frame index to which this input applies
+	netplay_frame m_frame_index; // the frame index to which this input applies
 	std::vector<netplay_input_port> m_ports;
 	
 	netplay_input() : m_frame_index(0) {}
-	netplay_input(unsigned long long frame_index);
-	netplay_input_port& add_input_port(int defvalue, int digital);
+	netplay_input(netplay_frame frame_index);
+	netplay_input_port& add_input_port(int digital);
 
 	bool operator==(const netplay_input& input) const
 	{
@@ -127,7 +119,9 @@ struct netplay_input
 	{
 		writer.header('I', 'N', 'P', 'T');
 		writer.write(m_frame_index);
-		writer.write((unsigned int)m_ports.size());
+		
+		netplay_assert(m_ports.size() <= 255);
+		writer.write((unsigned char)m_ports.size());
 
 		for(auto& port : m_ports)
 		{
@@ -141,7 +135,7 @@ struct netplay_input
 		reader.header('I', 'N', 'P', 'T');
 		reader.read(m_frame_index);
 
-		unsigned int num_ports;
+		unsigned char num_ports;
 		reader.read(num_ports);
 		m_ports.resize(num_ports);
 
@@ -151,27 +145,7 @@ struct netplay_input
 		}
 	}
 
-	std::string debug_string() const
-	{
-		std::stringstream ss;
-
-		ss << "input buffer\n";
-		ss << "num_ports = " << m_ports.size() << "\n";
-
-		for (auto i = 0; i < m_ports.size(); i++)
-		{
-			auto& port = m_ports[i];
-			ss << "- port #" << i << "\n";
-			ss << "- num_analog = " << port.m_analog_ports.size() << "\n";
-
-			for (auto q = 0; q < port.m_analog_ports.size(); q++)
-			{
-				ss << "- - analog #" << q << "\n";
-			}
-		}
-
-		return ss.str();
-	}
+	std::string debug_string() const;
 };
 
 #endif

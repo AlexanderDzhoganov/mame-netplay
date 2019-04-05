@@ -2036,6 +2036,7 @@ void ioport_manager::frame_update_callback()
 void ioport_manager::frame_update()
 {
 g_profiler.start(PROFILER_INPUT);
+
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
 	bool netplay_active = machine().netplay_active();
@@ -2080,10 +2081,10 @@ g_profiler.start(PROFILER_INPUT);
 
 			if (net_input != nullptr)
 			{
-				auto& net_port = net_input->add_input_port(live_port.defvalue, live_port.digital);
+				auto& net_port = net_input->add_input_port(live_port.digital);
 				for (auto& analog : live_port.analoglist)
 				{
-					net_port.add_analog_port(analog.m_accum, analog.m_previous, analog.m_sensitivity, analog.m_reverse);
+					net_port.add_analog_port(analog.m_accum, analog.m_previous);
 				}
 			}
 
@@ -2113,9 +2114,7 @@ g_profiler.start(PROFILER_INPUT);
 			{
 				inputs = peer->predict_input_state<netplay_dummy_predictor>(effective_frame);
 				if (inputs == nullptr)
-				{
 					continue;
-				}
 			}
 
 			// merge the inputs with the emulator ones
@@ -2129,9 +2128,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// finally submit my input state for sending
 		if (net_input != nullptr)
-		{
 			netplay.add_input_state(std::move(net_input));
-		}
 	}
 
 	// loop over all input ports
@@ -2149,25 +2146,18 @@ g_profiler.stop();
 
 void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
 {
-	// read the default value and the digital state
   live_port.digital = 0;
-	// live_port.defvalue = 0;
 
-  // loop over analog ports and save their data
   for (auto& analog : live_port.analoglist)
   {
-    // reset current and previous values
     analog.m_accum = 0;
     analog.m_previous = 0;
-		// analog.m_sensitivity = 0;
-		// analog.m_reverse = 0;
   }
 }
 
 void ioport_manager::netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port)
 {
 	// NETPLAY TODO: separate per peer mappings
-	live_port.defvalue |= net_port.m_defvalue;
 	live_port.digital |= net_port.m_digital;
 
 	auto analog_index = 0u;
@@ -2177,8 +2167,6 @@ void ioport_manager::netplay_update_ports(ioport_port_live& live_port, const net
 
 		analog.m_accum |= analog_port.m_accum;
 		analog.m_previous |= analog_port.m_previous;
-		analog.m_sensitivity |= analog_port.m_sensitivity;
-		analog.m_reverse |= analog_port.m_reverse;
 
 		analog_index++;
 	}

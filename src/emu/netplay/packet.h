@@ -32,9 +32,9 @@ struct netplay_handshake
 
 struct netplay_sync
 {
-	attotime m_sync_time;             // machine time at which the sync occurred
-	unsigned long long m_frame_count; // frame count at sync
-	unsigned int m_input_delay;       // current input delay value
+	attotime m_sync_time;        // machine time at which the sync occurred
+	netplay_frame m_frame_count; // frame count at sync
+	unsigned int m_input_delay;  // current input delay value
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
@@ -57,7 +57,7 @@ struct netplay_sync
 
 struct netplay_checksum
 {
-	unsigned long long m_frame_count;       // frame index of the latest state
+	netplay_frame m_frame_count;       // frame index of the latest state
 	std::vector<unsigned char> m_checksums; // block checksums
 
 	netplay_checksum() : m_frame_count(0) {}
@@ -92,19 +92,17 @@ struct netplay_checksum
 };
 
 template <typename StreamWriter>
-void netplay_packet_write(StreamWriter& writer, const attotime& timestamp, unsigned int flags)
+void netplay_packet_write(StreamWriter& writer, unsigned int flags)
 {
 	writer.header('P', 'A', 'K', 'T');
 	writer.write(flags);
-	writer.write(timestamp);
 }
 
 template <typename StreamReader>
-void netplay_packet_read(StreamReader& reader, attotime& timestamp, unsigned int& flags)
+void netplay_packet_read(StreamReader& reader, unsigned int& flags)
 {
 	reader.header('P', 'A', 'K', 'T');
 	reader.read(flags);
-	reader.read(timestamp);
 }
 
 template <typename StreamWriter>

@@ -15,6 +15,7 @@ void netplay_stream_writer<T>::write(const std::string& value)
 template <typename T>
 void netplay_stream_reader<T>::header(char a, char b, char c, char d)
 {
+#ifdef NETPLAY_DEBUG
 	char arr[4];
 	read(arr, 4);
 
@@ -26,6 +27,7 @@ void netplay_stream_reader<T>::header(char a, char b, char c, char d)
 
 		// maybe we should throw here?
 	}
+#endif
 }
 
 template <typename T>

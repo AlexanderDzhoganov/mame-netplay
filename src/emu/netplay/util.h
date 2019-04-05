@@ -25,7 +25,7 @@ public:
 
 	void push_back(const T& value)
 	{
-		if (m_cursor < N)
+		if (m_buffer.size() < N)
 			m_buffer.push_back(value);
 		else
 			m_buffer[m_cursor] = value;

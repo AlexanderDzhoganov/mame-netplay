@@ -1,16 +1,23 @@
 #ifndef MAME_EMU_NETPLAY_SERIALIZATION_H
 #define MAME_EMU_NETPLAY_SERIALIZATION_H
 
+// #define NETPLAY_DEBUG
+
 template <typename Stream>
 class netplay_stream_writer
 {
 public:
 	netplay_stream_writer(Stream& stream) : m_stream(stream) {}
 
+#ifdef NETPLAY_DEBUG
 	void header(char a, char b, char c, char d) { write(a); write(b); write(c); write(d); }
+#else
+	void header(char a, char b, char c, char d) {} // this is a no-op when not compiled in debug mode
+#endif
+
 	void write(bool value) { write(value ? (char)1 : (char)0); }
 	void write(const std::string& value);
-	void write(const attotime& value) { write(value.m_seconds); write(value.m_attoseconds); }
+	void write(const attotime& value) { write(value.as_double()); }
 	void write(void* data, size_t size) { m_stream.write(data, size); }
 	template <typename T> void write(const T& value) { write((void*)&value, (size_t)sizeof(T)); }
 
@@ -29,7 +36,7 @@ public:
 	void header(char a, char b, char c, char d);
 	void read(bool& value) { char c; read(c); value = c == (char)1; }
 	void read(std::string& value);
-	void read(attotime& value) { read(value.m_seconds); read(value.m_attoseconds); }
+	void read(attotime& value) { double d; read(d); value = attotime::from_double(d); }
 	void read(void* data, size_t size) { m_stream.read(data, size); }
 	template <typename T> void read(T& value) { read((void*)&value, (size_t)sizeof(T)); }
 

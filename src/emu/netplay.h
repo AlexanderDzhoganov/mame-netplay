@@ -14,7 +14,7 @@ struct netplay_sync;
 struct netplay_checksum;
 
 typedef std::vector<std::shared_ptr<netplay_memory>> netplay_blocklist;
-typedef unsigned long long netplay_frame;
+typedef unsigned int netplay_frame;
 
 struct netplay_state
 {
@@ -25,7 +25,6 @@ struct netplay_state
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
 typedef netplay_circular_buffer<netplay_state, 5> netplay_statelist;
-typedef netplay_circular_buffer<netplay_frame, 600> netplay_rollback_history;
 
 class netplay_manager
 {
@@ -71,8 +70,8 @@ private:
 	void load_state(const netplay_state& state);
 	bool rollback(netplay_frame before_frame);
 	void send_full_sync(const netplay_peer& peer);
-	void handle_host_packet(netplay_socket_reader& reader, const netplay_addr& sender);
-	void handle_client_packet(netplay_socket_reader& reader, const netplay_addr& sender);
+	void handle_host_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
+	void handle_client_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
 	void handle_input(std::unique_ptr<netplay_input> input_state, netplay_peer& peer);
 	void handle_checksum(std::unique_ptr<netplay_checksum> checksum, netplay_peer& peer);
@@ -104,15 +103,14 @@ private:
 	bool m_initial_sync;              // (client only) whether the initial sync has completed
 	bool m_rollback;                  // are we rolling back this update?
 	netplay_frame m_rollback_frame;   // where to rollback to
-	netplay_frame m_checksum_frame;   // (client only) when to send the next checksum
-	netplay_frame m_ping_frame;       // (server only) when to send the next ping
 	netplay_frame m_frame_count;      // current "frame" (update) count
 
-	std::unique_ptr<netplay_checksum> m_pending_checksum;
+	std::list<std::unique_ptr<netplay_checksum>> m_pending_checksums;
 
-	netplay_rollback_history m_rollback_history;
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 	attotime m_startup_time;
+	attotime m_last_ping_time;
+	bool m_has_ping_time;
 };
 
 #endif

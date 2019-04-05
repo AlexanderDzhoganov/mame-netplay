@@ -2,14 +2,14 @@
 #define MAME_EMU_NETPLAY_PEER_H
 
 typedef netplay_circular_buffer<std::shared_ptr<netplay_input>, 30> netplay_input_buffer;
-typedef netplay_circular_buffer<double, 10> netplay_ping_history;
+typedef netplay_circular_buffer<double, 15> netplay_ping_history;
 
 // this is the trivial imput predictor
 // it simply repeats the previous frame inputs
 class netplay_dummy_predictor
 {
 public:
-	std::unique_ptr<netplay_input> operator() (const netplay_input_buffer& inputs, unsigned long long frame_index)
+	std::unique_ptr<netplay_input> operator() (const netplay_input_buffer& inputs, netplay_frame frame_index)
 	{
 		return inputs.empty() ? nullptr : std::make_unique<netplay_input>(*inputs.newest());
 	}
@@ -26,7 +26,7 @@ public:
 	void add_input_state(std::unique_ptr<netplay_input> input_state);
 
 	template <typename Predictor>
-	netplay_input* predict_input_state(unsigned long long frame_index)
+	netplay_input* predict_input_state(netplay_frame frame_index)
 	{
 		Predictor predictor;
 		auto predicted = predictor(m_inputs, frame_index);
@@ -41,9 +41,10 @@ public:
 		return predicted_ptr;
 	}
 
-	netplay_input* get_inputs_for(unsigned long long frame_index);
-	netplay_input* get_predicted_inputs_for(unsigned long long frame_index);
+	netplay_input* get_inputs_for(netplay_frame frame_index);
+	netplay_input* get_predicted_inputs_for(netplay_frame frame_index);
 	double average_latency();
+	double highest_latency();
 	void add_latency_measurement(double latency) { m_ping_history.push_back(latency); }
 
 	bool self() const { return m_self; }

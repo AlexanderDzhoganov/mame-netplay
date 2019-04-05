@@ -21,9 +21,18 @@
 #define BEGIN_PACKET(FLAGS)                         \
 	netplay_memory_stream stream;                     \
 	netplay_socket_writer writer(stream);             \
-	netplay_packet_write(writer, system_time(), FLAGS);
+	netplay_packet_write(writer, FLAGS);
 
 #define END_PACKET(ADDR) do { m_socket->send(stream, ADDR); } while(0);
+
+/* * *   TODO   * * *
+ *
+ * - posix & win32 sockets
+ * - packet compression
+ * - support more than 2 players
+ * - input remapping
+ *
+ */
 
 //-------------------------------------------------
 // netplay_manager
@@ -39,10 +48,10 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	 m_initial_sync(false),
 	 m_rollback(false),
 	 m_rollback_frame(0),
-	 m_checksum_frame(0),
-	 m_ping_frame(0),
 	 m_frame_count(0),
-	 m_startup_time(system_time())
+	 m_startup_time(system_time()),
+	 m_last_ping_time(0, 0),
+	 m_has_ping_time(false)
 {
 	auto host_address = m_machine.options().netplay_host();
 
@@ -52,9 +61,9 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	m_max_block_size = 512 * 1024;      // 512kb max block size
 	m_input_delay_min = 3;              // minimum input delay
 	m_input_delay_max = 20;             // maximum input delay
-	m_input_delay = 3;                  // use N frames of input delay
-	m_checksum_every = 75;              // checksum every N frames
-	m_ping_every = 50;                  // ping every N frames
+	m_input_delay = 4;                  // use N frames of input delay
+	m_checksum_every = 9;               // checksum every N frames
+	m_ping_every = 5;                   // ping every N frames
 	m_max_rollback = 2;                 // max rollback of 2 frames
 
 	for (auto i = 0; i < m_states.capacity(); i++)
@@ -105,34 +114,26 @@ void netplay_manager::update()
 		return;
 	}
 
-	if (!m_waiting_for_client && !machine().paused())
-	{
-		// auto target_time = machine().time() + netplay_frametime;
-		auto target_frame = m_frame_count + 1;
-
-		while (m_frame_count < target_frame)
-			machine().scheduler().timeslice();
-
-		if (machine().scheduler().can_save())
-			store_state();
-	}
-
 	if (m_host)
 	{
-		if (m_frame_count % 100 == 0)
+		if (m_frame_count % 60 == 0)
 			recalculate_input_delay();
 
-		auto& checksum = m_pending_checksum;
-		if (checksum != nullptr && checksum->m_frame_count <= m_frame_count)
+		for (auto it = m_pending_checksums.begin(); it != m_pending_checksums.end(); ++it)
 		{
+			auto& checksum = *it;
+			if (checksum->m_frame_count >= m_frame_count)
+				continue;
+
 			handle_checksum(std::move(checksum), *m_peers[1]);
-			m_pending_checksum = nullptr;
+			it = m_pending_checksums.erase(it);
 		}
 	}
 
 	if (m_rollback && !rollback(m_rollback_frame) && m_host)
 	{
-		m_waiting_for_client = true;
+		if (machine().scheduler().can_save())
+				store_state();
 
 		for(auto& peer : m_peers)
 		{
@@ -141,45 +142,62 @@ void netplay_manager::update()
 
 			send_full_sync(*peer);
 		}
+
+		m_waiting_for_client = true;
 	}
 
 	m_rollback = false;
+
+	if (!m_waiting_for_client && !machine().paused())
+	{
+		auto current_frame = m_frame_count;
+		while (m_frame_count == current_frame)
+			machine().scheduler().timeslice();
+
+		if (machine().scheduler().can_save())
+			store_state();
+	}
 }
 
 void netplay_manager::recalculate_input_delay()
 {
-	auto input_delay = m_input_delay;
-	auto window_size = m_rollback_history.capacity();
-	auto rollback_count = 0u;
+	NETPLAY_LOG("recalculating input delay");
 
-	// calculate how many times we had to rollback in the last 600 frames
-	for (auto& frame : m_rollback_history)
-		rollback_count += (frame + window_size >= m_frame_count) ? 1 : 0;
-
-	// if we rolled back more than 1/5th of the frames, increase the input delay
-	if (rollback_count >= (window_size / 5))
-		input_delay++;
+	auto target_latency = 0.0;
 
 	// find the peer with the highest latency
-	auto highest_latency = 0.0;
 	for (auto& peer : m_peers)
 	{
 		if (peer->self())
 			continue;
 		
-		auto latency = peer->average_latency();
-		if (highest_latency < latency)
-			highest_latency = latency;
+		auto avg_latency = peer->average_latency();
+		auto highest_latency = peer->highest_latency();
+
+		// if the highest latency is more than 4/3rds the average latency
+		// take the highest latency as a target
+		if ((4.0 / 3.0) * avg_latency < highest_latency)
+		{
+			avg_latency = highest_latency;
+		}
+
+		target_latency = std::max(target_latency, avg_latency);
 	}
 
+	NETPLAY_LOG("highest_latency = %d", (int)target_latency);
+
 	// adjust the input delay
-	auto calculated_delay = (unsigned int)(highest_latency / (1000.0 / 60.0)) + 1;
+	auto calculated_delay = (unsigned int)(target_latency / (1000.0 / 60.0)) + 1;
+	NETPLAY_LOG("calculated_delay = %d", (int)calculated_delay);
+
+	auto input_delay = m_input_delay;
 	if (calculated_delay + 1 < input_delay)
 		input_delay--;
 	else if (calculated_delay > input_delay)
 		input_delay++;
 
 	input_delay = std::max(m_input_delay_min, std::min(input_delay, m_input_delay_max));
+	NETPLAY_LOG("input_delay = %d", (int)input_delay);
 	set_input_delay(input_delay);
 }
 
@@ -190,8 +208,6 @@ void netplay_manager::set_input_delay(unsigned int input_delay)
 
 	m_input_delay = input_delay;
 	NETPLAY_LOG("setting input delay to %d frames", m_input_delay);
-
-	m_rollback_history.clear();
 
 	for(auto& peer : m_peers)
 	{
@@ -262,15 +278,14 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 {
 	netplay_assert(before_frame <= m_frame_count); // impossible to go to the future
 
-	// record the frame time in the rollback history buffer
-	// we use this information to decide whether to increase or decrease input delay
-	m_rollback_history.push_back(m_frame_count);
+	NETPLAY_LOG("rollback to %d", before_frame);
 
 	if (before_frame + m_max_rollback < m_frame_count)
 	{
 		// we don't want to rollback farther than m_max_rollback
 		// because the rollback will likely take longer than resyncing
 		// NETPLAY_LOG("rollback failed: max rollback frames exceeded (wanted %llu frames)", m_frame_count - before_frame);
+		NETPLAY_LOG("too late");
 		return false;
 	}
 
@@ -299,6 +314,7 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 		// the given time is too far in the past and there is no state to rollback to
 		// bail out and let the caller figure it out
 		// NETPLAY_LOG("rollback failed: no state available at frame %llu", before_frame);
+		NETPLAY_LOG("no state");
 		return false;
 	}
 
@@ -314,6 +330,7 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 		machine().scheduler().timeslice();
 
 	m_catching_up = false;
+	NETPLAY_LOG("success");
 
 	/*if (m_debug)
 	{
@@ -346,12 +363,8 @@ void netplay_manager::send_full_sync(const netplay_peer& peer)
 	END_PACKET(peer.address());
 }
 
-void netplay_manager::handle_host_packet(netplay_socket_reader& reader, const netplay_addr& sender)
+void netplay_manager::handle_host_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender)
 {
-	unsigned int flags;
-	attotime packet_time;
-	netplay_packet_read(reader, packet_time, flags);
-
 	if (flags & NETPLAY_SYNC_ACK)
 	{
 		m_waiting_for_client = false;
@@ -367,7 +380,7 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, const ne
 		auto& peer = add_peer(handshake.m_name, sender);
 		
 		if (m_debug)
-			NETPLAY_LOG("initial sync with %s at %lld", peer.name().c_str(), m_frame_count);
+			NETPLAY_LOG("initial sync with %s at %d", peer.name().c_str(), m_frame_count);
 
 		if (machine().scheduler().can_save())
 			store_state();
@@ -396,7 +409,7 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, const ne
 			handle_input(std::move(input), *peer);
 		}
 
-		// we piggyback memory checksums on inputs packets
+		// we piggyback memory checksums and pings on inputs packets
 		if (flags & NETPLAY_CHECKSUM)
 		{
 			auto checksum = std::make_unique<netplay_checksum>();
@@ -404,6 +417,25 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, const ne
 			if (peer != nullptr)
 			{
 				handle_checksum(std::move(checksum), *peer);
+			}
+		}
+
+		if (flags & NETPLAY_PONG)
+		{
+			attotime ping_time;
+			reader.read(ping_time);
+
+			auto peer = get_peer_by_addr(sender);
+			if (peer != nullptr)
+			{
+				// multiply by 1000 to get milliseconds
+				auto latency = (system_time() - ping_time).as_double() * 1000.0;
+
+				// clamp the latency to a reasonable value (1ms-250ms) to remove outliers
+				latency = std::max(1.0, std::min(latency, 250.0));
+
+				// add new latency measurement for this peer
+				peer->add_latency_measurement(latency);
 			}
 		}
 
@@ -416,40 +448,13 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, const ne
 		NETPLAY_LOG("received new input delay '%d'", m_input_delay);
 		return;
 	} 
-
-	if (flags & NETPLAY_PONG)
-	{
-		attotime ping_time;
-		reader.read(ping_time);
-
-		auto peer = get_peer_by_addr(sender);
-		if (peer != nullptr)
-		{
-			// multiply by 1000 to get milliseconds
-			auto latency = (system_time() - ping_time).as_double() * 1000.0;
-
-			// clamp the latency to a reasonable value (1ms-250ms) to remove outliers
-			latency = std::max(1.0, std::min(latency, 250.0));
-
-			// add new latency measurement for this peer
-			peer->add_latency_measurement(latency);
-			NETPLAY_LOG("measured %dms latency for peer %s", (int)latency, peer->name().c_str());
-		}
-
-		return;
-	}
 }
 
-void netplay_manager::handle_client_packet(netplay_socket_reader& reader, const netplay_addr& sender)
+void netplay_manager::handle_client_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender)
 {
 	auto peer = get_peer_by_addr(sender);
 	if (peer == nullptr)
 		return;
-
-	// first read the packet header
-	unsigned int flags;
-	attotime packet_time;
-	netplay_packet_read(reader, packet_time, flags);
 
 	if (flags & NETPLAY_SYNC)
 	{
@@ -468,12 +473,8 @@ void netplay_manager::handle_client_packet(netplay_socket_reader& reader, const 
 		// pings piggyback on input packets
 		if (flags & NETPLAY_PING)
 		{
-			attotime host_time;
-			reader.read(host_time);
-
-			BEGIN_PACKET(NETPLAY_PONG);
-				writer.write(host_time);
-			END_PACKET(sender);
+			reader.read(m_last_ping_time);
+			m_has_ping_time = true;
 		}
 
 		return;
@@ -490,7 +491,7 @@ void netplay_manager::handle_client_packet(netplay_socket_reader& reader, const 
 void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer)
 {
 	if (m_debug)
-		NETPLAY_LOG("sync at frame %lld and time %s", sync.m_frame_count, sync.m_sync_time.as_string(4));
+		NETPLAY_LOG("sync at frame %d and time %s", sync.m_frame_count, sync.m_sync_time.as_string(4));
 
 	m_input_delay = sync.m_input_delay;
 
@@ -513,7 +514,6 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 	if (!m_host)
 	{
 		m_initial_sync = true;
-		m_checksum_frame = m_frame_count + m_checksum_every;
 		m_rollback = false; // make sure we don't rollback after a sync
 	}
 }
@@ -561,13 +561,16 @@ void netplay_manager::handle_input(std::unique_ptr<netplay_input> input_state, n
 
 void netplay_manager::handle_checksum(std::unique_ptr<netplay_checksum> checksum, netplay_peer& peer)
 {
+	netplay_assert(checksum != nullptr);
+
 	if (checksum->m_frame_count >= m_frame_count)
 	{
-		m_pending_checksum = std::make_unique<netplay_checksum>();
-		m_pending_checksum->m_frame_count = checksum->m_frame_count;
-		m_pending_checksum->m_checksums = std::move(checksum->m_checksums);
+		m_pending_checksums.push_back(std::move(checksum));
 		return;
 	}
+
+	bool state_found = false;
+	bool resync = false;
 
 	for (auto& state : m_states)
 	{
@@ -576,11 +579,11 @@ void netplay_manager::handle_checksum(std::unique_ptr<netplay_checksum> checksum
 			continue;
 		}
 
+		state_found = true;
+
 		auto& blocks = state.m_blocks;
 		netplay_assert(blocks.size() == checksum->m_checksums.size());
 		
-		bool resync = false;
-
 		for (auto i = 0; i < blocks.size(); i++)
 		{
 			auto& block = *blocks[i];
@@ -596,18 +599,18 @@ void netplay_manager::handle_checksum(std::unique_ptr<netplay_checksum> checksum
 			resync = true;
 			break;
 		}
+	}
 
-		if (resync)
-		{
-			if (machine().scheduler().can_save())
-				store_state();
+	if (resync || !state_found)
+	{
+		if (machine().scheduler().can_save())
+			store_state();
 
-			// we had to resync so increase the input delay temporarily
-			m_input_delay++;
-			send_full_sync(peer);
-			m_waiting_for_client = true;
-			m_rollback = false;
-		}
+		// we had to resync so increase the input delay temporarily
+		m_input_delay++;
+		send_full_sync(peer);
+		m_waiting_for_client = true;
+		m_rollback = false;
 	}
 }
 
@@ -662,10 +665,14 @@ void netplay_manager::socket_disconnected(const netplay_addr& address)
 
 void netplay_manager::socket_data(netplay_socket_reader& reader, const netplay_addr& sender)
 {
+	// read the packet header
+	unsigned int flags;
+	netplay_packet_read(reader, flags);
+
 	if (m_host)
-		handle_host_packet(reader, sender);
+		handle_host_packet(reader, flags, sender);
 	else
-		handle_client_packet(reader, sender);
+		handle_client_packet(reader, flags, sender);
 }
 
 // called by save_manager whenever a device creates a memory block for itself
@@ -711,7 +718,7 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 {
 	if ((!m_host && !m_initial_sync) || m_frame_count <= m_input_delay)
 		return;
-	
+
 	netplay_assert(m_initialized);
 	netplay_assert(input_state != nullptr);
 	netplay_assert(!m_peers.empty());
@@ -723,9 +730,11 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 			continue;
 
 		unsigned int flags = NETPLAY_INPUTS;
-		if (!m_host && m_checksum_frame <= m_frame_count)
+		if (!m_host && m_frame_count % m_checksum_every == 0)
 			flags |= NETPLAY_CHECKSUM;
-		if (m_host && m_ping_frame <= m_frame_count)
+		if (!m_host && m_has_ping_time)
+			flags |= NETPLAY_PONG;
+		if (m_host && m_frame_count % m_ping_every == 0)
 			flags |= NETPLAY_PING;
 
 		BEGIN_PACKET(flags)
@@ -745,13 +754,18 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 				}
 
 				checksum.serialize(writer);
-				m_checksum_frame = m_frame_count + m_checksum_every;
 			}
-			else if (flags & NETPLAY_PING)
+			
+			if (flags & NETPLAY_PING)
 			{
 				// just send the current time
-				auto sys_time = system_time();
-				writer.write(sys_time);
+				writer.write(system_time());
+			}
+
+			if (flags & NETPLAY_PONG)
+			{
+				writer.write(m_last_ping_time);
+				m_has_ping_time = false;
 			}
 		END_PACKET(peer->address());
 	}
