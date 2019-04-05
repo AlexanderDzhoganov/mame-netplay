@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "netplay.h"
+#include "netplay/util.h"
 #include "netplay/input_state.h"
 #include "netplay/peer.h"
 
@@ -40,4 +41,17 @@ netplay_input* netplay_peer::get_predicted_inputs_for(unsigned long long frame_i
 	}
 
 	return nullptr;
+}
+
+double netplay_peer::average_latency()
+{
+	double avg_latency = 0.0;
+
+	for (auto& measurement : m_ping_history)
+	{
+		avg_latency += measurement;
+	}
+
+	avg_latency /= (double)m_ping_history.size();
+	return avg_latency;
 }

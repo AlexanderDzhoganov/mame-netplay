@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 #include <unistd.h>
+#include <memory>
 
 #include "emu.h"
 #include "emuopts.h"
@@ -39,22 +40,25 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	 m_rollback(false),
 	 m_rollback_frame(0),
 	 m_checksum_frame(0),
-	 m_frame_count(0)
+	 m_ping_frame(0),
+	 m_frame_count(0),
+	 m_startup_time(system_time())
 {
 	auto host_address = m_machine.options().netplay_host();
 
 	// configuration options
-	m_debug = true; // netplay debug printing
+	m_debug = true;                     // netplay debug printing
 	m_host = strlen(host_address) == 0; // is this node the host
-	m_max_block_size = 512 * 1024; // 512kb max block size
-	m_input_delay = 3; // use 3 frames of input delay
-	m_checksum_every = 100; // checksum every 100 frames
-	m_max_rollback = 3; // max rollback of 3 frames
+	m_max_block_size = 512 * 1024;      // 512kb max block size
+	m_input_delay_min = 3;
+	m_input_delay_max = 20;
+	m_input_delay = 3;                  // use 3 frames of input delay
+	m_checksum_every = 120;             // checksum every 120 frames
+	m_ping_every = 60;                  // ping every 60 frames
+	m_max_rollback = 3;                 // max rollback of 3 frames
 
 	for (auto i = 0; i < m_states.capacity(); i++)
-	{
 		m_states.push_back(netplay_state());
-	}
 }
 
 bool netplay_manager::initialize()
@@ -106,7 +110,8 @@ void netplay_manager::update()
 {
 	netplay_assert(m_initialized);
 
-	if (machine().scheduled_event_pending())
+	auto time_since_startup = system_time() - m_startup_time;
+	if (machine().scheduled_event_pending() || time_since_startup.seconds() <= 1.0)
 	{
 		return;
 	}
@@ -161,6 +166,21 @@ void netplay_manager::update_host()
 	{
 		handle_checksum(std::move(m_pending_checksum), *m_peers[1]);
 		m_pending_checksum = nullptr;
+	}
+
+	if (m_ping_frame <= m_frame_count)
+	{
+		for(auto& peer : m_peers)
+		{
+			if (peer->self())
+				continue;
+			
+			BEGIN_PACKET(NETPLAY_PING);
+				writer.write(system_time());
+			END_PACKET(peer->address());
+		}
+
+		m_ping_frame = m_frame_count + m_ping_every;
 	}
 
 	netplay_socket_stream stream;
@@ -233,6 +253,25 @@ void netplay_manager::update_host()
 				handle_checksum(std::move(checksum), *peer);
 			}
 		}
+		else if (flags & NETPLAY_PONG)
+		{
+			attotime ping_time;
+			reader.read(ping_time);
+
+			auto peer = get_peer_by_addr(sender);
+			if (peer != nullptr)
+			{
+				// multiply by 1000 to get milliseconds
+				auto latency = (system_time() - ping_time).as_double() * 1000.0;
+
+				// clamp the latency to a reasonable value (1ms-250ms) to remove outliers
+				latency = std::max(1.0, std::min(latency, 250.0));
+
+				// add new latency measurement for this peer
+				peer->add_latency_measurement(latency);
+				NETPLAY_LOG("measured %dms latency for peer %s", (int)latency, peer->name().c_str());
+			}
+		}
 	}
 }
 
@@ -277,38 +316,53 @@ void netplay_manager::update_client()
 			reader.read(m_input_delay);
 			NETPLAY_LOG("received new input delay '%d'", m_input_delay);
 		}
+		else if (flags & NETPLAY_PING)
+		{
+			attotime host_time;
+			reader.read(host_time);
+
+			BEGIN_PACKET(NETPLAY_PONG);
+				writer.write(host_time);
+			END_PACKET(sender);
+		}
 	}
 }
 
 void netplay_manager::recalculate_input_delay()
 {
-	auto rollback_count = 0u;
-
-	// calculate how many times we had to rollback in the last 100 frames
-	for (auto& frame : m_rollback_history)
-	{
-		rollback_count += (frame + 600 >= m_frame_count) ? 1 : 0;
-	}
-
 	auto old_delay = m_input_delay;
 
-	// increase or decrease input delay accordingly
-	if (rollback_count > 50)
-	{
-		m_input_delay++;
-	}
-	/*else if (rollback_count == 0)
-	{
-		m_input_delay--;
-	}*/
+	const auto window_size = 600;
+	auto rollback_count = 0u;
 
-	m_input_delay = std::max(m_input_delay, NETPLAY_MIN_INPUT_DELAY);
-	m_input_delay = std::min(m_input_delay, NETPLAY_MAX_INPUT_DELAY);
+	// calculate how many times we had to rollback in the last 600 frames
+	for (auto& frame : m_rollback_history)
+		rollback_count += (frame + window_size >= m_frame_count) ? 1 : 0;
+
+	// if we rolled back more than 1/3rd of the frames, increase the input delay
+	if (rollback_count >= (window_size / 3))
+		m_input_delay++;
+	
+	auto highest_latency = 0.0;
+	for (auto& peer : m_peers)
+	{
+		auto latency = peer->average_latency();
+		if (highest_latency < latency)
+		{
+			highest_latency = latency;
+		}
+	}
+
+	auto calculated_delay = (unsigned int)(highest_latency / (1000.0 / 60.0));
+	if (calculated_delay + 1 < m_input_delay)
+		m_input_delay--;
+	else if (calculated_delay - 1 > m_input_delay)
+		m_input_delay++;
+
+	m_input_delay = std::max(m_input_delay_min, std::min(m_input_delay, m_input_delay_max));
 
 	if (m_input_delay == old_delay)
-	{
 		return;
-	}
 
 	NETPLAY_LOG("setting input delay to %d frames", m_input_delay);
 	m_rollback_history.clear();
@@ -629,6 +683,8 @@ void netplay_manager::socket_disconnected(const netplay_addr& address)
 			break;
 		}
 	}
+
+	m_waiting_for_client = false;
 }
 
 // called by save_manager whenever a device creates a memory block for itself

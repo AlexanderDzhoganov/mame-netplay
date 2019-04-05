@@ -8,7 +8,9 @@ enum netplay_packet_flags
 	NETPLAY_SYNC_ACK   = 1 << 2, // sync acknowledgement
 	NETPLAY_INPUTS     = 1 << 4, // packet contains player inputs
 	NETPLAY_CHECKSUM   = 1 << 5, // memory checksum
-	NETPLAY_SET_DELAY  = 1 << 6  // set a new input delay
+	NETPLAY_SET_DELAY  = 1 << 6, // set a new input delay
+	NETPLAY_PING       = 1 << 7, // ping used for estimating latency
+	NETPLAY_PONG       = 1 << 8  // ping response
 };
 
 struct netplay_handshake

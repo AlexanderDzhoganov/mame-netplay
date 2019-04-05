@@ -2,6 +2,7 @@
 #define MAME_EMU_NETPLAY_PEER_H
 
 typedef netplay_circular_buffer<std::shared_ptr<netplay_input>, 30> netplay_input_buffer;
+typedef netplay_circular_buffer<double, 10> netplay_ping_history;
 
 // this is the trivial imput predictor
 // it simply repeats the previous frame inputs
@@ -42,6 +43,8 @@ public:
 
 	netplay_input* get_inputs_for(unsigned long long frame_index);
 	netplay_input* get_predicted_inputs_for(unsigned long long frame_index);
+	double average_latency();
+	void add_latency_measurement(double latency) { m_ping_history.push_back(latency); }
 
 	bool self() const { return m_self; }
 	const std::string& name() const { return m_name; }
@@ -49,6 +52,7 @@ public:
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
+	const netplay_ping_history& ping_history() const { return m_ping_history; }
 
 protected:
 	bool m_self;                             // whether this is our peer
@@ -57,6 +61,7 @@ protected:
 	attotime m_join_time;                    // when the peer joined
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
+	netplay_ping_history m_ping_history;
 };
 
 #endif

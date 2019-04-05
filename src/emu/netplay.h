@@ -7,10 +7,6 @@
 #include "netplay/serialization.h"
 #include "netplay/socket.h"
 
-#define NETPLAY_ROLLBACK_HISTORY_SIZE 600
-#define NETPLAY_MIN_INPUT_DELAY 3u
-#define NETPLAY_MAX_INPUT_DELAY 20u
-
 class netplay_memory;
 class netplay_peer;
 struct netplay_input;
@@ -29,6 +25,7 @@ struct netplay_state
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
 typedef netplay_circular_buffer<netplay_state, 5> netplay_statelist;
+typedef netplay_circular_buffer<netplay_frame, 600> netplay_rollback_history;
 
 class netplay_manager
 {
@@ -88,8 +85,11 @@ private:
 	bool m_debug;                     // whether debug logging for netplay is enabled
 	bool m_host;                      // whether this node is the host
 	size_t m_max_block_size;          // maximum memory block size, blocks larger than this get split up
+	unsigned int m_input_delay_min;   // minimum input delay
+	unsigned int m_input_delay_max;   // maximum input delay
 	unsigned int m_input_delay;       // how many frames of input delay to use, higher numbers result in less rollbacks
 	unsigned int m_checksum_every;    // how often to send checksum checks
+	unsigned int m_ping_every;        // how often to send pings
 	unsigned int m_max_rollback;      // maximum number of frames we're allowed to rollback
 
 	netplay_peerlist m_peers;         // connected peers
@@ -104,12 +104,14 @@ private:
 	bool m_rollback;                  // are we rolling back this update?
 	netplay_frame m_rollback_frame;   // where to rollback to
 	netplay_frame m_checksum_frame;   // (client only) when to send the next checksum
+	netplay_frame m_ping_frame;       // (server only) when to send the next ping
 	netplay_frame m_frame_count;      // current "frame" (update) count
 
 	std::unique_ptr<netplay_checksum> m_pending_checksum;
 
-	netplay_circular_buffer<netplay_frame, NETPLAY_ROLLBACK_HISTORY_SIZE> m_rollback_history;
+	netplay_rollback_history m_rollback_history;
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
+	attotime m_startup_time;
 };
 
 #endif

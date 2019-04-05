@@ -1,4 +1,5 @@
 #include <string>
+#include <vector>
 
 #include "netplay.h"
 #include "netplay/serialization.h"
