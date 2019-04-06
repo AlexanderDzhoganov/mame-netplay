@@ -1,7 +1,7 @@
 #ifndef MAME_EMU_NETPLAY_SERIALIZATION_H
 #define MAME_EMU_NETPLAY_SERIALIZATION_H
 
-// #define NETPLAY_DEBUG
+#define NETPLAY_DEBUG
 
 template <typename Stream>
 class netplay_stream_writer
@@ -58,6 +58,7 @@ public:
 
 	bool eof() const { return m_cursor >= m_data.size(); }
 	size_t size() const { return m_data.size(); }
+	size_t cursor() const { return m_cursor; }
 
 	const std::vector<char>& data() { return m_data; }
 

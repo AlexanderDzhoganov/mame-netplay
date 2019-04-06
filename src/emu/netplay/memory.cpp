@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 
+#include "util/hash.h"
 #include "netplay.h"
 #include "netplay/memory.h"
 #include "netplay/fnv.h"
@@ -22,7 +23,8 @@ netplay_memory::netplay_memory
 	m_module_name(name),
 	m_name(name),
 	m_data(nullptr),
-	m_owns_memory(true)
+	m_owns_memory(true),
+	m_has_checksum(false)
 {
 	netplay_assert(size > 0);
 	m_data = new char[size];
@@ -42,7 +44,8 @@ netplay_memory::netplay_memory
 	m_module_name(name),
 	m_name(name),
 	m_data((char*)data),
-	m_owns_memory(false)
+	m_owns_memory(false),
+	m_has_checksum(false)
 {
 	netplay_assert(data != nullptr);
 	netplay_assert(size > 0);
@@ -60,31 +63,22 @@ netplay_memory::~netplay_memory()
 void netplay_memory::copy_from(const netplay_memory& block)
 {
 	netplay_assert(m_size == block.m_size);
+
 	memcpy(m_data, block.m_data, m_size);
+	
+	m_has_checksum = block.m_has_checksum;
+	m_checksum = block.m_checksum;
 }
 
-unsigned char netplay_memory::checksum() const
+unsigned short netplay_memory::checksum()
 {
-	unsigned char checksum = 0;
+	if (m_has_checksum)
+		return m_checksum;
 
-	for (auto i = 0u; i < m_size; i++)
-	{
-		checksum ^= m_data[i];
-	}
-
-	return checksum;
-}
-
-unsigned char netplay_memory::checksum(const netplay_blocklist& blocks)
-{
-	unsigned char checksum = 0;
-
-	for (auto& block : blocks)
-	{
-		checksum ^= block->checksum();
-	}
-
-	return checksum;
+	auto crc16 = util::crc16_creator::simple(m_data, m_size);
+	m_checksum = crc16.m_raw;
+	m_has_checksum = true;
+	return m_checksum;
 }
 
 std::string netplay_memory::get_debug_string()

@@ -30,31 +30,43 @@ public:
 		else
 			m_buffer[m_cursor] = value;
 
-		m_cursor = (m_cursor + 1) % m_capacity;
+		if(m_buffer.size() > 1)
+			m_cursor = (m_cursor + 1) % m_buffer.size();
 	}
 
 	bool empty() const { return m_buffer.empty(); }
 	size_t size() const { return m_buffer.size(); }
 	size_t capacity() const { return m_capacity; }
-	void set_capacity(size_t capacity) { m_capacity = capacity; }
 	const std::vector<T>& items() const { return m_buffer; }
-	void clear() { m_buffer.clear(); m_cursor = 0; }
+
+	void set_capacity(size_t capacity)
+	{
+		m_capacity = capacity; 
+		m_buffer.reserve(capacity);
+		m_buffer.clear();
+	}
+
+	void clear()
+	{
+		m_buffer.clear();
+		m_cursor = 0;
+	}
 
 	T& newest()
 	{
-		netplay_assert(!m_buffer.empty());
-		return m_cursor == 0 ? m_buffer.back() : m_buffer[m_cursor - 1];
+		netplay_assert(m_cursor < m_buffer.size());
+		return m_buffer[m_cursor];
 	}
 
 	const T& newest() const
 	{
-		netplay_assert(!m_buffer.empty());
-		return m_cursor == 0 ? m_buffer.back() : m_buffer[m_cursor - 1];
+		netplay_assert(m_cursor < m_buffer.size());
+		return m_buffer[m_cursor];
 	}
 	
 	void advance(int offset)
 	{ 
-		m_cursor = (m_cursor + offset) % std::min(m_buffer.size(), m_capacity);
+		m_cursor = (m_cursor + offset) % m_buffer.size();
 	}
 
 	auto begin() { return m_buffer.begin(); }

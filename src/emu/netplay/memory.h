@@ -11,7 +11,6 @@ public:
 	~netplay_memory();
 
 	void copy_from(const netplay_memory& block);
-	void copy_from(void* data, size_t size);
 
 	unsigned int index() const { return m_index; }
 	unsigned int module_hash() const { return m_module_hash; }
@@ -20,10 +19,10 @@ public:
 	void* data() const { return m_data; }
 	size_t size() const { return m_size; }
 	bool owns_memory() const { return m_owns_memory; }
+	void invalidate_checksum() { m_has_checksum = false; }
 	std::string get_debug_string();
 	
-	unsigned char checksum() const;
-	static unsigned char checksum(const netplay_blocklist& blocks);
+	unsigned short checksum();
 
 private:
 	size_t m_size;
@@ -33,6 +32,8 @@ private:
 	std::string m_name;
 	char* m_data;
 	bool m_owns_memory;
+	bool m_has_checksum;
+	unsigned short m_checksum;
 };
 
 #endif
