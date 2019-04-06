@@ -18,26 +18,27 @@ template <typename T, size_t N>
 class netplay_circular_buffer
 {
 public:
-	netplay_circular_buffer() : m_cursor(0)
+	netplay_circular_buffer() : m_cursor(0), m_capacity(N)
 	{
 		m_buffer.reserve(N);
 	}
 
 	void push_back(const T& value)
 	{
-		if (m_buffer.size() < N)
+		if (m_buffer.size() < m_capacity)
 			m_buffer.push_back(value);
 		else
 			m_buffer[m_cursor] = value;
 
-		m_cursor = (m_cursor + 1) % N;
+		m_cursor = (m_cursor + 1) % m_capacity;
 	}
 
 	bool empty() const { return m_buffer.empty(); }
 	size_t size() const { return m_buffer.size(); }
-	size_t capacity() const { return N; }
+	size_t capacity() const { return m_capacity; }
+	void set_capacity(size_t capacity) { m_capacity = capacity; }
 	const std::vector<T>& items() const { return m_buffer; }
-	void clear() { m_buffer.clear(); m_cursor =0; }
+	void clear() { m_buffer.clear(); m_cursor = 0; }
 
 	T& newest()
 	{
@@ -53,7 +54,7 @@ public:
 	
 	void advance(int offset)
 	{ 
-		m_cursor = (m_cursor + offset) % std::min(m_buffer.size(), N);
+		m_cursor = (m_cursor + offset) % std::min(m_buffer.size(), m_capacity);
 	}
 
 	auto begin() { return m_buffer.begin(); }
@@ -64,6 +65,7 @@ public:
 private:
 	std::vector<T> m_buffer;
 	size_t m_cursor;
+	size_t m_capacity;
 };
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef MAME_EMU_NETPLAY_PEER_H
 #define MAME_EMU_NETPLAY_PEER_H
 
-typedef netplay_circular_buffer<std::shared_ptr<netplay_input>, 30> netplay_input_buffer;
+typedef netplay_circular_buffer<netplay_input, 30> netplay_input_buffer;
 typedef netplay_circular_buffer<double, 15> netplay_ping_history;
 
 // this is the trivial imput predictor
@@ -9,9 +9,16 @@ typedef netplay_circular_buffer<double, 15> netplay_ping_history;
 class netplay_dummy_predictor
 {
 public:
-	std::unique_ptr<netplay_input> operator() (const netplay_input_buffer& inputs, netplay_frame frame_index)
+	bool operator() (const netplay_input_buffer& inputs, netplay_input& predicted, netplay_frame frame_index)
 	{
-		return inputs.empty() ? nullptr : std::make_unique<netplay_input>(*inputs.newest());
+		if (inputs.empty())
+		{
+			return false;
+		}
+
+		predicted = inputs.newest();
+		predicted.m_frame_index = frame_index;
+		return true;
 	}
 };
 
@@ -23,26 +30,26 @@ class netplay_peer
 
 public:
 	netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self = false);
-	void add_input_state(std::unique_ptr<netplay_input> input_state);
+	
+	netplay_input& get_next_input_buffer();
+	netplay_input* get_inputs_for(netplay_frame frame_index);
+	netplay_input* get_predicted_inputs_for(netplay_frame frame_index);
 
 	template <typename Predictor>
 	netplay_input* predict_input_state(netplay_frame frame_index)
 	{
 		Predictor predictor;
-		auto predicted = predictor(m_inputs, frame_index);
 
-		if (predicted == nullptr)
+		m_predicted_inputs.advance(1);
+		auto& predicted = m_predicted_inputs.newest();
+		if(predictor(m_inputs, predicted, frame_index))
 		{
-			return nullptr;
+			return &predicted;
 		}
 
-		auto predicted_ptr = predicted.get();
-		m_predicted_inputs.push_back(std::move(predicted));
-		return predicted_ptr;
+		return nullptr;
 	}
 
-	netplay_input* get_inputs_for(netplay_frame frame_index);
-	netplay_input* get_predicted_inputs_for(netplay_frame frame_index);
 	double average_latency();
 	double highest_latency();
 	void add_latency_measurement(double latency) { m_ping_history.push_back(latency); }
@@ -62,7 +69,7 @@ protected:
 	attotime m_join_time;                    // when the peer joined
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
-	netplay_ping_history m_ping_history;
+	netplay_ping_history m_ping_history;     // latency measurements history
 };
 
 #endif

@@ -1,17 +1,27 @@
 // #ifdef EMSCRIPTEN
 
-#include <deque>
 #include <emscripten.h>
 
 #include "netplay.h"
 #include "netplay/serialization.h"
 #include "netplay/socket.h"
 
+struct netplay_socket_impl
+{
+  std::vector<char> m_scratchpad;
+};
+
 netplay_socket* netplay_socket_instance = nullptr;
 
 netplay_socket::netplay_socket(netplay_manager& manager) : m_manager(manager)
 {
+  m_impl = new netplay_socket_impl();
   netplay_socket_instance = this; // pretty hacky, there's probably a better way
+}
+
+netplay_socket::~netplay_socket()
+{
+  delete m_impl;
 }
 
 netplay_addr netplay_socket::get_self_address() const
@@ -48,10 +58,24 @@ netplay_status netplay_socket::disconnect(const netplay_addr& address)
 netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay_addr& address)
 {
   auto& data = stream.data();
+  size_t orig_size = data.size();
 
+  auto& compressed = m_impl->m_scratchpad;
+  auto max_size = lzma_max_compressed_size(orig_size);
+  compressed.resize(max_size + sizeof(size_t));
+
+  size_t compressed_size = compressed.size();
+  if(!lzma_compress(data.data(), orig_size, compressed.data() + sizeof(size_t), compressed_size))
+  {
+    NETPLAY_LOG("lzma compression error");
+    return NETPLAY_LZMA_ERROR;
+  }
+
+  memcpy(compressed.data(), &orig_size, sizeof(size_t));
+  
   EM_ASM_ARGS({
 		jsmame_netplay_packet($0, $1, $2);
-  }, (unsigned int)data.data(), (unsigned int)data.size(), (unsigned int)address.m_peerid.c_str());
+  }, (unsigned int)compressed.data(), (unsigned int)compressed_size, (unsigned int)address.m_peerid.c_str());
   
 	return NETPLAY_NO_ERR;
 }
@@ -68,7 +92,19 @@ void netplay_socket::socket_disconnected(const netplay_addr& address)
 
 void netplay_socket::socket_data(char* data, int length, char* sender)
 {
-  netplay_raw_byte_stream stream(data, length);
+  size_t orig_size;
+  memcpy(&orig_size, data, sizeof(size_t));
+
+  auto& scratchpad = m_impl->m_scratchpad;
+  scratchpad.resize(orig_size);
+
+  if (!lzma_decompress(data + sizeof(size_t), length, scratchpad.data(), orig_size))
+  {
+    NETPLAY_LOG("lzma decompression error");
+    return;
+  }
+
+  netplay_raw_byte_stream stream(scratchpad.data(), scratchpad.size());
   netplay_socket_reader reader(stream);
 
   auto addr = netplay_socket::str_to_addr(sender);

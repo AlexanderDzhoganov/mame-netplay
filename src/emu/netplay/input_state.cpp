@@ -13,11 +13,6 @@ netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous
 	return analog_port;
 }
 
-netplay_input::netplay_input(netplay_frame frame_index) : m_frame_index(frame_index)
-{
-	m_ports.reserve(16);
-}
-
 netplay_input_port& netplay_input::add_input_port(int digital)
 {
 	m_ports.emplace_back();

@@ -10,20 +10,28 @@ netplay_peer::netplay_peer(const std::string& name, const netplay_addr& address,
 	m_self(self),
 	m_name(name),
 	m_address(address),
-	m_join_time(join_time) {}
-
-void netplay_peer::add_input_state(std::unique_ptr<netplay_input> input_state)
+	m_join_time(join_time)
 {
-	m_inputs.push_back(std::move(input_state));
+	for (auto i = 0; i < m_inputs.capacity(); i++)
+		m_inputs.push_back(netplay_input());
+
+	for (auto i = 0; i < m_predicted_inputs.capacity(); i++)
+		m_predicted_inputs.push_back(netplay_input());
+}
+
+netplay_input& netplay_peer::get_next_input_buffer()
+{
+	m_inputs.advance(1);
+	return m_inputs.newest();
 }
 
 netplay_input* netplay_peer::get_inputs_for(netplay_frame frame_index)
 {
 	for (auto& input : m_inputs)
 	{
-		if (input->m_frame_index == frame_index)
+		if (input.m_frame_index == frame_index)
 		{
-			return input.get();
+			return &input;
 		}
 	}
 
@@ -34,9 +42,9 @@ netplay_input* netplay_peer::get_predicted_inputs_for(netplay_frame frame_index)
 {
 	for (auto& input : m_predicted_inputs)
 	{
-		if (input->m_frame_index == frame_index)
+		if (input.m_frame_index == frame_index)
 		{
-			return input.get();
+			return &input;
 		}
 	}
 

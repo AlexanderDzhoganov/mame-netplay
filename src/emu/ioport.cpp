@@ -2066,9 +2066,14 @@ g_profiler.start(PROFILER_INPUT);
 	for (auto &port : m_portlist)
 		port.second->update_defvalue(false);
 
-	std::unique_ptr<netplay_input> net_input;
+	netplay_input* net_input = nullptr;
 	if (netplay_active && !machine().netplay().catching_up())
-		net_input = std::make_unique<netplay_input>(machine().netplay().frame_count());
+	{
+		auto& peer = machine().netplay().peers()[0];
+		net_input = &(peer->get_next_input_buffer());
+		net_input->m_frame_index = machine().netplay().frame_count();
+		net_input->m_ports.clear();
+	}
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
@@ -2128,7 +2133,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// finally submit my input state for sending
 		if (net_input != nullptr)
-			netplay.add_input_state(std::move(net_input));
+			netplay.send_input_state(*net_input);
 	}
 
 	// loop over all input ports

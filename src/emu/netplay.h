@@ -37,18 +37,16 @@ public:
 
 	bool initialize();
 	void update();
-	void print_debug_info();
-
-	running_machine& machine() { return m_machine; }
 
 	bool initialized() const { return m_initialized; }
 	bool catching_up() const { return m_catching_up; }
 	bool input_enabled() const { return m_frame_count > m_input_delay; }
-
-	attotime system_time() const;
 	netplay_frame frame_count() const { return m_frame_count; }
 	unsigned int input_delay() const { return m_input_delay; }
 	const netplay_peerlist& peers() const { return m_peers; }
+	running_machine& machine() { return m_machine; }
+	attotime system_time() const;
+	void print_debug_info();
 
 protected:
 	// called by the socket implementation
@@ -60,7 +58,7 @@ protected:
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
 
 	// methods called by ioport_manager
-	void add_input_state(std::unique_ptr<netplay_input> input_state);
+	void send_input_state(netplay_input& input_state);
 	void next_frame() { m_frame_count++; }
 
 private:
@@ -73,7 +71,7 @@ private:
 	void handle_host_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
 	void handle_client_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
-	void handle_input(std::unique_ptr<netplay_input> input_state, netplay_peer& peer);
+	void handle_input(netplay_input& input_state, netplay_peer& peer);
 	void handle_checksum(std::unique_ptr<netplay_checksum> checksum, netplay_peer& peer);
 
 	netplay_peer& add_peer(const std::string& name, const netplay_addr& address, bool self = false);

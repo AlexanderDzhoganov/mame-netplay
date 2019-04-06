@@ -62,10 +62,11 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	m_input_delay_min = 3;              // minimum input delay
 	m_input_delay_max = 20;             // maximum input delay
 	m_input_delay = 4;                  // use N frames of input delay
-	m_checksum_every = 9;               // checksum every N frames
+	m_checksum_every = 17;              // checksum every N frames
 	m_ping_every = 5;                   // ping every N frames
-	m_max_rollback = 2;                 // max rollback of 2 frames
+	m_max_rollback = 3;                 // max rollback of N frames
 
+	m_states.set_capacity(m_max_rollback + 1);
 	for (auto i = 0; i < m_states.capacity(); i++)
 		m_states.push_back(netplay_state());
 }
@@ -150,9 +151,20 @@ void netplay_manager::update()
 
 	if (!m_waiting_for_client && !machine().paused())
 	{
+		auto sim_start = system_time();
+
 		auto current_frame = m_frame_count;
 		while (m_frame_count == current_frame)
 			machine().scheduler().timeslice();
+
+		auto sim_duration = (system_time() - sim_start).as_double();
+		static bool perf_warning = true;
+		if (perf_warning && sim_duration > (1.0 / 60.0))
+		{
+			NETPLAY_LOG("(WARNING) simulation is taking longer than real time");
+			NETPLAY_LOG("(WARNING) make sure you can run the game at full speed");
+			perf_warning = false;
+		}
 
 		if (machine().scheduler().can_save())
 			store_state();
@@ -278,14 +290,11 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 {
 	netplay_assert(before_frame <= m_frame_count); // impossible to go to the future
 
-	NETPLAY_LOG("rollback to %d", before_frame);
-
 	if (before_frame + m_max_rollback < m_frame_count)
 	{
 		// we don't want to rollback farther than m_max_rollback
 		// because the rollback will likely take longer than resyncing
 		// NETPLAY_LOG("rollback failed: max rollback frames exceeded (wanted %llu frames)", m_frame_count - before_frame);
-		NETPLAY_LOG("too late");
 		return false;
 	}
 
@@ -314,7 +323,6 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 		// the given time is too far in the past and there is no state to rollback to
 		// bail out and let the caller figure it out
 		// NETPLAY_LOG("rollback failed: no state available at frame %llu", before_frame);
-		NETPLAY_LOG("no state");
 		return false;
 	}
 
@@ -330,7 +338,6 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 		machine().scheduler().timeslice();
 
 	m_catching_up = false;
-	NETPLAY_LOG("success");
 
 	/*if (m_debug)
 	{
@@ -401,12 +408,12 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, unsigned
 
 	if (flags & NETPLAY_INPUTS)
 	{
-		auto input = std::make_unique<netplay_input>();
-		input->deserialize(reader);
 		auto peer = get_peer_by_addr(sender);
 		if (peer != nullptr)
 		{
-			handle_input(std::move(input), *peer);
+			auto& input = peer->get_next_input_buffer();
+			input.deserialize(reader);
+			handle_input(input, *peer);
 		}
 
 		// we piggyback memory checksums and pings on inputs packets
@@ -466,9 +473,9 @@ void netplay_manager::handle_client_packet(netplay_socket_reader& reader, unsign
 
 	if (flags & NETPLAY_INPUTS)
 	{
-		auto input = std::make_unique<netplay_input>();
-		input->deserialize(reader);
-		handle_input(std::move(input), *peer);
+		auto& input = peer->get_next_input_buffer();
+		input.deserialize(reader);
+		handle_input(input, *peer);
 
 		// pings piggyback on input packets
 		if (flags & NETPLAY_PING)
@@ -519,11 +526,9 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 }
 
 // handle inputs coming over the network
-void netplay_manager::handle_input(std::unique_ptr<netplay_input> input_state, netplay_peer& peer)
+void netplay_manager::handle_input(netplay_input& input_state, netplay_peer& peer)
 {
-	netplay_assert(input_state != nullptr);
-
-	auto effective_frame = input_state->m_frame_index + m_input_delay;
+	auto effective_frame = input_state.m_frame_index + m_input_delay;
 
 	// NETPLAY_LOG("received input: frame = %llu, effective = %llu, time = %s, my_time = %s, my_frame = %llu",
 		// input_state->m_frame_index, effective_frame, input_state->m_timestamp.as_string(4), machine().time().as_string(4), m_frame_count);
@@ -531,18 +536,14 @@ void netplay_manager::handle_input(std::unique_ptr<netplay_input> input_state, n
 	// if the input is in the future it means we're falling behind
 	// record it and move on
 	if (effective_frame > m_frame_count)
-	{
-		// add the input to the peer's buffer and bail out
-		peer.add_input_state(std::move(input_state));
 		return;
-	}
 
 	// get any predicted input we used in place of this one
 	auto predicted_input = peer.get_predicted_inputs_for(effective_frame);
 
 	// test if both the actual and predicted inputs are the same
 	// if the predicted inputs differ then we do a rollback to just before the input time
-	if (predicted_input == nullptr || *predicted_input != *input_state)
+	if (predicted_input == nullptr || *predicted_input != input_state)
 	{
 		if (!m_rollback)
 		{
@@ -553,9 +554,6 @@ void netplay_manager::handle_input(std::unique_ptr<netplay_input> input_state, n
 		{
 			m_rollback_frame = effective_frame;
 		}
-
-		// add this input state to the peer's buffers so it can be used during the rollback
-		peer.add_input_state(std::move(input_state));
 	}
 }
 
@@ -575,9 +573,7 @@ void netplay_manager::handle_checksum(std::unique_ptr<netplay_checksum> checksum
 	for (auto& state : m_states)
 	{
 		if(state.m_frame_count != checksum->m_frame_count)
-		{
 			continue;
-		}
 
 		state_found = true;
 
@@ -714,13 +710,12 @@ void netplay_manager::create_memory_block(const std::string& module_name, const 
 }
 
 // called by ioport every update with the new input state
-void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state)
+void netplay_manager::send_input_state(netplay_input& input_state)
 {
 	if ((!m_host && !m_initial_sync) || m_frame_count <= m_input_delay)
 		return;
 
 	netplay_assert(m_initialized);
-	netplay_assert(input_state != nullptr);
 	netplay_assert(!m_peers.empty());
 
 	// send the inputs to all peers
@@ -738,7 +733,7 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 			flags |= NETPLAY_PING;
 
 		BEGIN_PACKET(flags)
-			input_state->serialize(writer);
+			input_state.serialize(writer);
 
 			if (flags & NETPLAY_CHECKSUM)
 			{
@@ -769,9 +764,6 @@ void netplay_manager::add_input_state(std::unique_ptr<netplay_input> input_state
 			}
 		END_PACKET(peer->address());
 	}
-
-	// add the inputs to our own buffer
-	m_peers[0]->add_input_state(std::move(input_state));
 }
 
 netplay_peer& netplay_manager::add_peer(const std::string& name, const netplay_addr& address, bool self)
@@ -811,12 +803,8 @@ attotime netplay_manager::system_time() const
 netplay_peer* netplay_manager::get_peer_by_addr(const netplay_addr& address) const
 {
 	for(auto& peer : m_peers)
-	{
 		if (peer->address() == address)
-		{
 			return peer.get();
-		}
-	}
 
 	return nullptr;
 }
@@ -827,9 +815,7 @@ void netplay_manager::print_debug_info()
 
 	size_t total_mem = 0u;
 	for (auto& block : m_memory)
-	{
 		total_mem += block->size();
-	}
 
 	NETPLAY_LOG("total memory = %zu bytes", total_mem);
 
