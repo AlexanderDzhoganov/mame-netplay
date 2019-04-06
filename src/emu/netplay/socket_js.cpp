@@ -46,11 +46,11 @@ netplay_status netplay_socket::connect(const netplay_addr& address)
 
 netplay_status netplay_socket::disconnect(const netplay_addr& address)
 {
-  // NETPLAY TODO: implement this on the js side
+  auto addr = addr_to_str(address);
 
-  /*EM_ASM({
+  EM_ASM({
     jsmame_netplay_disconnect($0);
-  }, (unsigned int)address.c_str());*/
+  }, (unsigned int)addr.c_str());
 
 	return NETPLAY_NO_ERR;
 }
@@ -61,17 +61,18 @@ netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay
   size_t orig_size = data.size();
 
   auto& compressed = m_impl->m_scratchpad;
-  auto max_size = lzma_max_compressed_size(orig_size);
-  compressed.resize(max_size + sizeof(size_t));
+  auto compressed_size = netplay_max_compressed_size(orig_size);
+  compressed.resize(compressed_size + sizeof(size_t));
+  memcpy(compressed.data(), &orig_size, sizeof(size_t));
 
-  size_t compressed_size = compressed.size();
-  if(!lzma_compress(data.data(), orig_size, compressed.data() + sizeof(size_t), compressed_size))
+  if(!netplay_compress(data.data(), orig_size, compressed.data() + sizeof(size_t), compressed_size))
   {
+    netplay_assert("lzma compression error" == 0);
     NETPLAY_LOG("lzma compression error");
     return NETPLAY_LZMA_ERROR;
   }
 
-  memcpy(compressed.data(), &orig_size, sizeof(size_t));
+  compressed_size += sizeof(size_t);
   
   EM_ASM_ARGS({
 		jsmame_netplay_packet($0, $1, $2);
@@ -92,22 +93,26 @@ void netplay_socket::socket_disconnected(const netplay_addr& address)
 
 void netplay_socket::socket_data(char* data, int length, char* sender)
 {
+  auto addr = netplay_socket::str_to_addr(sender);
+
   size_t orig_size;
   memcpy(&orig_size, data, sizeof(size_t));
+ 
+  data += sizeof(size_t);
+  length -= sizeof(size_t);
 
   auto& scratchpad = m_impl->m_scratchpad;
   scratchpad.resize(orig_size);
 
-  if (!lzma_decompress(data + sizeof(size_t), length, scratchpad.data(), orig_size))
+  if (!netplay_decompress(data, length, scratchpad.data(), orig_size))
   {
     NETPLAY_LOG("lzma decompression error");
+    netplay_assert("lzma decompression error" == 0);
     return;
   }
 
-  netplay_raw_byte_stream stream(scratchpad.data(), scratchpad.size());
+  netplay_raw_byte_stream stream(scratchpad.data(), orig_size);
   netplay_socket_reader reader(stream);
-
-  auto addr = netplay_socket::str_to_addr(sender);
   m_manager.socket_data(reader, addr);
 }
 

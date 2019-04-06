@@ -86,8 +86,8 @@ private:
 typedef netplay_stream_writer<netplay_memory_stream> netplay_memory_writer;
 typedef netplay_stream_reader<netplay_memory_stream> netplay_memory_reader;
 
-size_t lzma_max_compressed_size(size_t size);
-bool lzma_compress(const char* src, size_t src_size, const char* dest, size_t& dest_size);
-bool lzma_decompress(const char* src, size_t src_size, const char* dest, size_t dest_size);
+size_t netplay_max_compressed_size(size_t size);
+bool netplay_compress(const char* src, size_t src_size, const char* dst, size_t& dst_size);
+bool netplay_decompress(const char* src, size_t src_size, const char* dst, size_t dst_size);
 
 #endif
