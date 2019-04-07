@@ -1,7 +1,7 @@
 #ifndef MAME_EMU_NETPLAY_SERIALIZATION_H
 #define MAME_EMU_NETPLAY_SERIALIZATION_H
 
-#define NETPLAY_DEBUG
+// #define NETPLAY_DEBUG
 
 template <typename Stream>
 class netplay_stream_writer

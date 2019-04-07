@@ -85,13 +85,6 @@
 
 #ifndef NO_NETPLAY
 #include "netplay.h"
-#include "netplay/util.h"
-#include "netplay/memory.h"
-#include "netplay/serialization.h"
-#include "netplay/socket.h"
-#include "netplay/input_state.h"
-#include "netplay/peer.h"
-#include "netplay/packet.h"
 #endif
 
 #include "romload.h"
@@ -218,20 +211,6 @@ void running_machine::start()
 	m_video = std::make_unique<video_manager>(*this);
 	m_ui = manager().create_ui(*this);
 
-#ifndef NO_NETPLAY
-
-	// initialize netplay
-	m_netplay = std::make_unique<netplay_manager>(*this);
-	if (options().netplay())
-	{
-		if (!m_netplay->initialize())
-			throw emu_fatalerror("netplay failed to initialize");
-
-		m_netplay_active = true;
-	}
-
-#endif
-
 	// initialize the base time (needed for doing record/playback)
 	::time(&m_base_time);
 
@@ -339,6 +318,17 @@ int running_machine::run(bool quiet)
 		// Don't do it earlier, config load can create network
 		// devices with timers.
 		m_save.allow_registration(false);
+
+#ifndef NO_NETPLAY
+		m_netplay = std::make_unique<netplay_manager>(*this);
+		if (options().netplay())
+		{
+			if (!m_netplay->initialize())
+				throw emu_fatalerror("netplay failed to initialize");
+
+			m_netplay_active = true;
+		}
+#endif
 
 		// load the NVRAM
 		nvram_load();

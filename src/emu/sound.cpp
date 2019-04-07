@@ -1123,7 +1123,7 @@ void sound_manager::update(void *ptr, int param)
 	if (finalmix_offset > 0)
 	{
 		bool netplay_catching_up = false;
-		if (machine().netplay_active() && machine().netplay().catching_up())
+		if (machine().netplay_active() && machine().netplay().waiting())
 			netplay_catching_up = true;
 
 		// if nosound mode is off and either netplay is not active

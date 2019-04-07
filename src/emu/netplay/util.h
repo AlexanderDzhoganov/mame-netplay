@@ -14,70 +14,63 @@
 } while(0);
 #endif
 
+typedef unsigned int netplay_frame;
+
 template <typename T, size_t N>
 class netplay_circular_buffer
 {
 public:
-	netplay_circular_buffer() : m_cursor(0), m_capacity(N)
-	{
-		m_buffer.reserve(N);
-	}
+	netplay_circular_buffer() : m_cursor(0), m_size(0) {}
 
 	void push_back(const T& value)
 	{
-		if (m_buffer.size() < m_capacity)
-			m_buffer.push_back(value);
-		else
-			m_buffer[m_cursor] = value;
+		if (m_size > 0)
+			advance(1);
 
-		if(m_buffer.size() > 1)
-			m_cursor = (m_cursor + 1) % m_buffer.size();
+		m_buffer[m_cursor] = value;
+		if (m_size < N)
+			m_size++;
 	}
 
-	bool empty() const { return m_buffer.empty(); }
-	size_t size() const { return m_buffer.size(); }
-	size_t capacity() const { return m_capacity; }
-	const std::vector<T>& items() const { return m_buffer; }
-
-	void set_capacity(size_t capacity)
-	{
-		m_capacity = capacity; 
-		m_buffer.reserve(capacity);
-		m_buffer.clear();
-	}
+	void advance(int offset) { m_cursor = (m_cursor + offset) % N; }
+	bool empty() const { return m_size == 0; }
+	size_t size() const { return m_size; }
+	size_t capacity() const { return N; }
 
 	void clear()
 	{
-		m_buffer.clear();
 		m_cursor = 0;
+		m_size = 0;
 	}
 
 	T& newest()
 	{
-		netplay_assert(m_cursor < m_buffer.size());
+		netplay_assert(m_cursor < m_size);
 		return m_buffer[m_cursor];
 	}
 
 	const T& newest() const
 	{
-		netplay_assert(m_cursor < m_buffer.size());
+		netplay_assert(m_cursor < m_size);
 		return m_buffer[m_cursor];
 	}
-	
-	void advance(int offset)
-	{ 
-		m_cursor = (m_cursor + offset) % m_buffer.size();
+
+	T& operator[] (size_t index)
+	{
+		netplay_assert(index < m_size);
+		return m_buffer[index];
 	}
 
-	auto begin() { return m_buffer.begin(); }
-	auto begin() const { return m_buffer.begin(); }
-	auto end() { return m_buffer.end(); }
-	auto end() const { return m_buffer.end(); }
+	const T& operator[] (size_t index) const
+	{
+		netplay_assert(index < m_size);
+		return m_buffer[index];
+	}
 
 private:
-	std::vector<T> m_buffer;
+	std::array<T, N> m_buffer;
 	size_t m_cursor;
-	size_t m_capacity;
+	size_t m_size;
 };
 
 #endif

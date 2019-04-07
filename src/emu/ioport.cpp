@@ -2067,7 +2067,7 @@ g_profiler.start(PROFILER_INPUT);
 		port.second->update_defvalue(false);
 
 	netplay_input* net_input = nullptr;
-	if (netplay_active && !machine().netplay().catching_up())
+	if (netplay_active && !machine().netplay().waiting())
 	{
 		auto& peer = machine().netplay().peers()[0];
 		net_input = &(peer->get_next_input_buffer());
@@ -2104,7 +2104,7 @@ g_profiler.start(PROFILER_INPUT);
 		}
 	}
 
-	if (netplay_active && machine().netplay().input_enabled())
+	if (netplay_active)
 	{
 		auto& netplay = machine().netplay();
 		auto effective_frame = netplay.frame_count() - netplay.input_delay();

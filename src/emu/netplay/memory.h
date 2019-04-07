@@ -22,7 +22,7 @@ public:
 	void invalidate_checksum() { m_has_checksum = false; }
 	std::string get_debug_string();
 	
-	unsigned short checksum();
+	unsigned int checksum();
 
 private:
 	size_t m_size;
@@ -33,7 +33,7 @@ private:
 	char* m_data;
 	bool m_owns_memory;
 	bool m_has_checksum;
-	unsigned short m_checksum;
+	unsigned int m_checksum;
 };
 
 #endif

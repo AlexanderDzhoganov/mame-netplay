@@ -31,7 +31,6 @@ struct netplay_handshake
 
 struct netplay_sync
 {
-	attotime m_timestamp;        // machine time at which the sync occurred
 	netplay_frame m_frame_count; // frame count at sync
 	unsigned int m_input_delay;  // current input delay value
 
@@ -39,7 +38,6 @@ struct netplay_sync
 	void serialize(StreamWriter& writer) const
 	{
 		writer.header('S', 'Y', 'N', 'C');
-		writer.write(m_timestamp);
 		writer.write(m_frame_count);
 		writer.write(m_input_delay);
 	}
@@ -48,7 +46,6 @@ struct netplay_sync
 	void deserialize(StreamReader& reader)
 	{
 		reader.header('S', 'Y', 'N', 'C');
-		reader.read(m_timestamp);
 		reader.read(m_frame_count);
 		reader.read(m_input_delay);
 	}
@@ -56,9 +53,9 @@ struct netplay_sync
 
 struct netplay_checksum
 {
-	netplay_frame m_frame_count;             // frame index of the latest state
-	std::vector<unsigned short> m_checksums; // block checksums
-	bool m_processed;                        // (non-serialized) whether we've processed these checksums
+	netplay_frame m_frame_count;           // frame index of the latest state
+	std::vector<unsigned int> m_checksums; // block checksums
+	bool m_processed;                      // (non-serialized) whether we've processed these checksums
 
 	netplay_checksum() : m_frame_count(0), m_processed(false) {}
 
@@ -69,8 +66,7 @@ struct netplay_checksum
 		writer.write(m_frame_count);
 		
 		writer.write((unsigned int)m_checksums.size());
-		for(auto checksum : m_checksums)
-			writer.write(checksum);
+		writer.write((void*)m_checksums.data(), m_checksums.size() * sizeof(unsigned int));
 	}
 
 	template <typename StreamReader>
@@ -82,26 +78,51 @@ struct netplay_checksum
 		unsigned int checksums_size;
 		reader.read(checksums_size);
 		m_checksums.resize(checksums_size);
+		reader.read((void*)m_checksums.data(), m_checksums.size() * sizeof(unsigned int));
+	}
+};
 
-		for (auto i = 0; i < checksums_size; i++)
-			reader.read(m_checksums[i]);
+struct netplay_set_delay
+{
+	netplay_frame m_frame_count;
+	unsigned int m_input_delay;
+	bool m_processed; // (non-serialized)
+
+	netplay_set_delay() : m_frame_count(0), m_input_delay(0), m_processed(true) {}
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.header('D', 'L', 'A', 'Y');
+		writer.write(m_frame_count);
+		writer.write(m_input_delay);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.header('D', 'L', 'A', 'Y');
+		reader.read(m_frame_count);
+		reader.read(m_input_delay);
 	}
 };
 
 template <typename StreamWriter>
-void netplay_packet_write(StreamWriter& writer, unsigned int flags, unsigned int sync_generation)
+void netplay_packet_write(StreamWriter& writer, unsigned int flags, unsigned int sync_generation, unsigned int packet_id)
 {
 	writer.header('P', 'A', 'K', 'T');
-	writer.write(flags);
+	writer.write(packet_id);
 	writer.write(sync_generation);
+	writer.write(flags);
 }
 
 template <typename StreamReader>
-void netplay_packet_read(StreamReader& reader, unsigned int& flags, unsigned int& sync_generation)
+void netplay_packet_read(StreamReader& reader, unsigned int& flags, unsigned int& sync_generation, unsigned int& packet_id)
 {
 	reader.header('P', 'A', 'K', 'T');
-	reader.read(flags);
+	reader.read(packet_id);
 	reader.read(sync_generation);
+	reader.read(flags);
 }
 
 template <typename StreamWriter>
@@ -114,7 +135,7 @@ void netplay_packet_add_block(StreamWriter& writer, const netplay_memory& block)
 }
 
 template <typename StreamReader>
-void netplay_packet_copy_blocks(StreamReader& reader, const netplay_blocklist& blocks)
+void netplay_packet_read_blocks(StreamReader& reader, const netplay_blocklist& blocks)
 {
 	unsigned int index;
 	unsigned int size;

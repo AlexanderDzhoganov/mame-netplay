@@ -243,6 +243,9 @@ void video_manager::frame_update(bool from_debugger)
 			m_empty_skip_count = 0;
 	}
 
+	if (machine().netplay_active() && machine().netplay().waiting())
+		skipped_it = true;
+
 	// draw the user interface
 	emulator_info::draw_user_interface(machine());
 

@@ -271,7 +271,6 @@ files {
 	MAME_DIR .. "src/emu/netplay/serialization.cpp",
 	MAME_DIR .. "src/emu/netplay/serialization.h",
 	MAME_DIR .. "src/emu/netplay/module_blacklist.h",
-	MAME_DIR .. "src/emu/netplay/fnv.h",
 	MAME_DIR .. "src/emu/netplay.cpp",
 	MAME_DIR .. "src/emu/netplay.h"
 }

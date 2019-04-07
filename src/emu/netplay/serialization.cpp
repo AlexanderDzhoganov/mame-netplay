@@ -80,11 +80,23 @@ void netplay_raw_byte_stream::read(void* data, size_t size)
 template class netplay_stream_writer<netplay_memory_stream>;
 template class netplay_stream_reader<netplay_raw_byte_stream>;
 
-void* netplay_lzma_alloc(void* ptr, size_t size) { return (void*)new char[size]; }
-void netplay_lzma_free(void*, void* ptr) { delete[] (char*)ptr; }
+void* netplay_lzma_alloc(void*, size_t size)
+{
+	return new char[size];
+}
+
+void netplay_lzma_free(void*, void* ptr)
+{
+	delete [] (char*)ptr;
+}
+
 ISzAlloc netplay_lzma_alloc_fn = {&netplay_lzma_alloc, &netplay_lzma_free};
 
-size_t netplay_max_compressed_size(size_t size) { return size + size / 3 + 128 + LZMA_PROPS_SIZE; }
+// this props array depends on the CLzmaEncProps passed to LzmaEncode
+// if those are changed then the values here must be changed too
+unsigned char netplay_lzma_props[] = {0x5d, 0x0, 0x0, 0x1, 0x0};
+
+size_t netplay_max_compressed_size(size_t size) { return size + size / 3 + 128; }
 
 bool netplay_compress(const char* src, size_t src_size, const char* dst, size_t& dst_size)
 {
@@ -92,25 +104,29 @@ bool netplay_compress(const char* src, size_t src_size, const char* dst, size_t&
 	netplay_assert(src_size > 0);
 	netplay_assert(dst != nullptr);
 
-	CLzmaEncProps props;
-  LzmaEncProps_Init(&props);
-	props.level = LZMA_COMPRESSION_LEVEL;
-	props.dictSize = 65536;
-	props.writeEndMark = 0;
-	LzmaEncProps_Normalize(&props);
+	static CLzmaEncProps props;
+	static bool props_initialized = false;
+
+	if (!props_initialized)
+	{
+		LzmaEncProps_Init(&props);
+		props.level = LZMA_COMPRESSION_LEVEL;
+		props.dictSize = 65536;
+		props.writeEndMark = 0;
+		LzmaEncProps_Normalize(&props);
+		props_initialized = true;
+	}
 
 	size_t props_size = LZMA_PROPS_SIZE;
 
-	if(LzmaEncode(
-		(unsigned char*)(dst + LZMA_PROPS_SIZE), &dst_size,
+	auto result = LzmaEncode(
+		(unsigned char*)dst, &dst_size,
 		(unsigned char*)src, src_size,
-		&props, (unsigned char*)dst, &props_size,
+		&props, netplay_lzma_props, &props_size,
 		0, 0, &netplay_lzma_alloc_fn, &netplay_lzma_alloc_fn
-	) != SZ_OK)
-		return false;
+	);
 
-	dst_size += LZMA_PROPS_SIZE;
-	return true;
+	return result == SZ_OK;
 }
 
 bool netplay_decompress(const char* src, size_t src_size, const char* dst, size_t dst_size)
@@ -120,11 +136,12 @@ bool netplay_decompress(const char* src, size_t src_size, const char* dst, size_
 	netplay_assert(dst != nullptr);
 	netplay_assert(dst_size > 0);
 
-	src_size -= LZMA_PROPS_SIZE;
-	return LzmaDecode(
+	auto result = LzmaDecode(
 		(unsigned char*)dst, &dst_size,
-		(unsigned char*)(src + LZMA_PROPS_SIZE), &src_size,
-		(unsigned char*)src, LZMA_PROPS_SIZE,
+		(unsigned char*)src, &src_size,
+		netplay_lzma_props, LZMA_PROPS_SIZE,
 		LZMA_FINISH_END, 0, &netplay_lzma_alloc_fn
-	) == SZ_OK;
+	);
+
+	return result == SZ_OK;
 }

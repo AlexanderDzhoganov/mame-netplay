@@ -117,6 +117,7 @@ class save_manager
 
 	friend class ram_state;
 	friend class rewinder;
+	friend class netplay_manager;
 
 public:
 	// construction/destruction

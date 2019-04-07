@@ -2,9 +2,11 @@
 #include <sstream>
 
 #include "util/hash.h"
+#include "netplay/util.h"
 #include "netplay.h"
 #include "netplay/memory.h"
-#include "netplay/fnv.h"
+
+#define CRC32(DATA, LENGTH) util::crc32_creator::simple(DATA, LENGTH).m_raw
 
 //-------------------------------------------------
 // netplay_memory
@@ -19,7 +21,7 @@ netplay_memory::netplay_memory
 ) :
 	m_size(size),
 	m_index(index),
-	m_module_hash(fnv1a(module_name)),
+	m_module_hash(CRC32(module_name.c_str(), module_name.length())),
 	m_module_name(name),
 	m_name(name),
 	m_data(nullptr),
@@ -40,7 +42,7 @@ netplay_memory::netplay_memory
 ) :
 	m_size(size),
 	m_index(index),
-	m_module_hash(fnv1a(module_name)),
+	m_module_hash(CRC32(module_name.c_str(), module_name.length())),
 	m_module_name(name),
 	m_name(name),
 	m_data((char*)data),
@@ -63,20 +65,17 @@ netplay_memory::~netplay_memory()
 void netplay_memory::copy_from(const netplay_memory& block)
 {
 	netplay_assert(m_size == block.m_size);
-
 	memcpy(m_data, block.m_data, m_size);
-	
-	m_has_checksum = block.m_has_checksum;
+	m_has_checksum = block.m_owns_memory && block.m_has_checksum;
 	m_checksum = block.m_checksum;
 }
 
-unsigned short netplay_memory::checksum()
+unsigned int netplay_memory::checksum()
 {
-	if (m_has_checksum)
+	if (m_owns_memory && m_has_checksum)
 		return m_checksum;
 
-	auto crc16 = util::crc16_creator::simple(m_data, m_size);
-	m_checksum = crc16.m_raw;
+	m_checksum = CRC32(m_data, m_size);
 	m_has_checksum = true;
 	return m_checksum;
 }

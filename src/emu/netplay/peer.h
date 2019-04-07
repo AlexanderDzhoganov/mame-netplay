@@ -70,6 +70,8 @@ protected:
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	netplay_ping_history m_ping_history;     // latency measurements history
+	netplay_frame m_last_input_frame;
+	unsigned int m_next_packet_id;
 };
 
 #endif
