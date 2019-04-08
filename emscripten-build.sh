@@ -8,5 +8,5 @@ emmake make -j5 \
   WEBASSEMBLY=1 TESTS=0 BENCHMARKS=0 PROFILER=0 PROFILE=0 \
   SYMBOLS=1 OPTIMIZE=3 FASTDEBUG=0 DEBUG=0 PTR64=0
 
-cp mamecps1.js ../emushare/public/
-cp mamecps1.wasm ../emushare/public/
+cp mamecps1.js ../emushare/frontend/public/
+cp mamecps1.wasm ../emushare/frontend/public/

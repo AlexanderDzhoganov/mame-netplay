@@ -43,12 +43,14 @@ float netplay_latency_estimator::predicted_latency()
 	return avg * confidence + high * (1.0f - confidence);
 }
 
-netplay_peer::netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self) :
+netplay_peer::netplay_peer(const netplay_addr& address, attotime join_time, bool self) :
+	m_state(NETPLAY_PEER_DISCONNECTED),
 	m_self(self),
-	m_name(name),
+	m_name("peer"),
 	m_address(address),
 	m_join_time(join_time),
-	m_last_input_frame(0)
+	m_last_input_frame(0),
+	m_last_system_time(0, 0)
 {
 	for (auto i = 0; i < m_inputs.capacity(); i++)
 		m_inputs.push_back(netplay_input());

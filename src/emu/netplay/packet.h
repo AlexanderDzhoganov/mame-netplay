@@ -4,27 +4,69 @@
 enum netplay_packet_flags
 {
 	NETPLAY_HANDSHAKE  = 1 << 0, // handshake
-	NETPLAY_SYNC       = 1 << 1, // sync data
-	NETPLAY_INPUTS     = 1 << 2, // player inputs
-	NETPLAY_CHECKSUM   = 1 << 3, // memory checksum
-	NETPLAY_SET_DELAY  = 1 << 4, // set input delay
-	NETPLAY_PING       = 1 << 5, // ping
-	NETPLAY_PONG       = 1 << 6, // ping response
+	NETPLAY_READY      = 1 << 1, // client ready
+	NETPLAY_SYNC       = 1 << 2, // sync data
+	NETPLAY_INPUTS     = 1 << 3, // player inputs
+	NETPLAY_CHECKSUM   = 1 << 4, // memory checksum
+	NETPLAY_SET_DELAY  = 1 << 5  // set input delay
 };
 
 struct netplay_handshake
+{
+	std::string m_name;                // the human-readable name of this node
+	unsigned int m_sync_generation;    // current sync generation
+	std::vector<netplay_addr> m_peers; // peer addresses
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.header('H', 'E', 'L', 'O');
+		writer.write(m_name);
+		writer.write(m_sync_generation);
+
+		writer.write((unsigned int)m_peers.size());
+		for (auto& peer : m_peers)
+		{
+			auto addr = netplay_socket::addr_to_str(peer);
+			writer.write(addr);
+		}
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.header('H', 'E', 'L', 'O');
+		reader.read(m_name);
+		reader.read(m_sync_generation);
+
+		unsigned int num_peers;
+		reader.read(num_peers);
+		m_peers.resize(num_peers);
+
+		for (auto i = 0; i < num_peers; i++)
+		{
+			std::string addr;
+			reader.read(addr);
+			m_peers[i] = netplay_socket::str_to_addr(addr);
+		}
+	}
+};
+
+struct netplay_ready
 {
 	std::string m_name;
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
 	{
+		writer.header('R', 'E', 'D', 'Y');
 		writer.write(m_name);
 	}
 
 	template <typename StreamReader>
 	void deserialize(StreamReader& reader)
 	{
+		reader.header('R', 'E', 'D', 'Y');
 		reader.read(m_name);
 	}
 };
@@ -56,6 +98,7 @@ struct netplay_checksum
 	netplay_frame m_frame_count;           // frame index of the latest state
 	std::vector<unsigned int> m_checksums; // block checksums
 	bool m_processed;                      // (non-serialized) whether we've processed these checksums
+	netplay_addr m_peer_address;           // (non-serialized) the address of the peer who sent this checksum
 
 	netplay_checksum() : m_frame_count(0), m_processed(false) {}
 
@@ -106,22 +149,6 @@ struct netplay_set_delay
 		reader.read(m_input_delay);
 	}
 };
-
-template <typename StreamWriter>
-void netplay_packet_write(StreamWriter& writer, unsigned char flags, unsigned int sync_generation)
-{
-	writer.header('P', 'A', 'K', 'T');
-	writer.write(sync_generation);
-	writer.write(flags);
-}
-
-template <typename StreamReader>
-void netplay_packet_read(StreamReader& reader, unsigned char& flags, unsigned int& sync_generation)
-{
-	reader.header('P', 'A', 'K', 'T');
-	reader.read(sync_generation);
-	reader.read(flags);
-}
 
 template <typename StreamWriter>
 void netplay_packet_add_block(StreamWriter& writer, const netplay_memory& block)

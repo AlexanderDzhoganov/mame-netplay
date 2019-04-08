@@ -2069,10 +2069,13 @@ g_profiler.start(PROFILER_INPUT);
 	netplay_input* net_input = nullptr;
 	if (netplay_active && !machine().netplay().waiting())
 	{
-		auto& peer = machine().netplay().peers()[0];
-		net_input = &(peer->get_next_input_buffer());
-		net_input->m_frame_index = machine().netplay().frame_count();
-		net_input->m_ports.clear();
+		auto peer = machine().netplay().my_peer();
+		if (peer != nullptr)
+		{
+			net_input = &(peer->get_next_input_buffer());
+			net_input->m_frame_index = machine().netplay().frame_count();
+			net_input->m_ports.clear();
+		}
 	}
 
 	// loop over all input ports
@@ -2109,7 +2112,7 @@ g_profiler.start(PROFILER_INPUT);
 		auto& netplay = machine().netplay();
 		auto effective_frame = netplay.frame_count() - netplay.input_delay();
 
-		// then we'll apply remote inputs and try to predict the ones we are missing
+		// then we'll apply inputs and try to predict the ones we are missing
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{

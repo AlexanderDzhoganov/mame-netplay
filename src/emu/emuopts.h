@@ -200,6 +200,7 @@
 #define OPTION_NETPLAY              "netplay"
 #define OPTION_NETPLAY_DEBUG        "netplay_debug"
 #define OPTION_NETPLAY_HOST         "netplay_host"
+#define OPTION_NETPLAY_NAME         "netplay_name"
 #define OPTION_NETPLAY_BLOCK_SIZE   "netplay_block_size"
 
 //**************************************************************************
@@ -489,6 +490,7 @@ public:
 	// Netplay specific options
 	bool  netplay() const { return bool_value(OPTION_NETPLAY); }
 	bool  netplay_debug() const { return bool_value(OPTION_NETPLAY_DEBUG); }
+	const char *netplay_name() const { return value(OPTION_NETPLAY_NAME); }
 	const char *netplay_host() const { return value(OPTION_NETPLAY_HOST); }
 	int   netplay_block_size() const { return int_value(OPTION_NETPLAY_BLOCK_SIZE); }
 

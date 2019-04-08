@@ -26,6 +26,7 @@ public:
 	netplay_status connect(const netplay_addr& address);
 	netplay_status disconnect(const netplay_addr& address);
 	netplay_status send(netplay_memory_stream& stream, const netplay_addr& address);
+	netplay_status broadcast(netplay_memory_stream& stream);
 
 	bool socket_connected(const netplay_addr& address);
 	void socket_disconnected(const netplay_addr& address);

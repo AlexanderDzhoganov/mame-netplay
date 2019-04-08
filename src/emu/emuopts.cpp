@@ -223,6 +223,7 @@ const options_entry emu_options::s_option_entries[] =
 	{ nullptr,                                           nullptr,     OPTION_HEADER,     "NETPLAY OPTIONS" },
 	{ OPTION_NETPLAY,                                    "0",         OPTION_BOOLEAN,    "enable netplay" },
 	{ OPTION_NETPLAY_DEBUG,                              "0",         OPTION_BOOLEAN,    "enable netplay debugging" },
+	{ OPTION_NETPLAY_NAME,                               "foobar",    OPTION_STRING,     "human-readable name of this node" },
 	{ OPTION_NETPLAY_HOST,                               "",          OPTION_STRING,     "address of the netplay host" },
 	{ OPTION_NETPLAY_BLOCK_SIZE,                         "4096",      OPTION_INTEGER,    "maximum memory block size"   },
 

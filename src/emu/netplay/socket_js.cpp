@@ -9,6 +9,26 @@
 struct netplay_socket_impl
 {
   std::vector<char> m_scratchpad;
+
+  size_t compress(netplay_memory_stream& stream)
+  {
+    auto& data = stream.data();
+    size_t orig_size = data.size();
+
+    auto compressed_size = netplay_max_compressed_size(orig_size);
+    m_scratchpad.resize(compressed_size + sizeof(size_t));
+    memcpy(m_scratchpad.data(), &orig_size, sizeof(size_t));
+
+    if(!netplay_compress(data.data(), orig_size, m_scratchpad.data() + sizeof(size_t), compressed_size))
+    {
+      netplay_assert("lzma compression error" == 0);
+      NETPLAY_LOG("lzma compression error");
+      return 0;
+    }
+
+    compressed_size += sizeof(size_t);
+    return compressed_size;
+  }
 };
 
 netplay_socket* netplay_socket_instance = nullptr;
@@ -37,9 +57,9 @@ netplay_status netplay_socket::listen(const netplay_listen_socket& listen_opts)
 
 netplay_status netplay_socket::connect(const netplay_addr& address)
 {
-  EM_ASM({
-    jsmame_netplay_connect();
-  });
+  EM_ASM_ARGS({
+    jsmame_netplay_connect($0);
+  }, address.m_peerid.c_str());
 
 	return NETPLAY_NO_ERR;
 }
@@ -57,26 +77,34 @@ netplay_status netplay_socket::disconnect(const netplay_addr& address)
 
 netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay_addr& address)
 {
-  auto& data = stream.data();
-  size_t orig_size = data.size();
-
-  auto& compressed = m_impl->m_scratchpad;
-  auto compressed_size = netplay_max_compressed_size(orig_size);
-  compressed.resize(compressed_size + sizeof(size_t));
-  memcpy(compressed.data(), &orig_size, sizeof(size_t));
-
-  if(!netplay_compress(data.data(), orig_size, compressed.data() + sizeof(size_t), compressed_size))
+  auto compressed_size = m_impl->compress(stream);
+  if(compressed_size == 0)
   {
     netplay_assert("lzma compression error" == 0);
     NETPLAY_LOG("lzma compression error");
     return NETPLAY_LZMA_ERROR;
   }
-
-  compressed_size += sizeof(size_t);
   
   EM_ASM_ARGS({
 		jsmame_netplay_packet($0, $1, $2);
-  }, (unsigned int)compressed.data(), (unsigned int)compressed_size, (unsigned int)address.m_peerid.c_str());
+  }, (unsigned int)m_impl->m_scratchpad.data(), (unsigned int)compressed_size, (unsigned int)address.m_peerid.c_str());
+  
+	return NETPLAY_NO_ERR;
+}
+
+netplay_status netplay_socket::broadcast(netplay_memory_stream& stream)
+{
+  auto compressed_size = m_impl->compress(stream);
+  if(compressed_size == 0)
+  {
+    netplay_assert("lzma compression error" == 0);
+    NETPLAY_LOG("lzma compression error");
+    return NETPLAY_LZMA_ERROR;
+  }
+  
+  EM_ASM_ARGS({
+		jsmame_netplay_broadcast($0, $1);
+  }, (unsigned int)m_impl->m_scratchpad.data(), (unsigned int)compressed_size);
   
 	return NETPLAY_NO_ERR;
 }

@@ -17,7 +17,7 @@ public:
 
 	void write(bool value) { write(value ? (char)1 : (char)0); }
 	void write(const std::string& value);
-	void write(const attotime& value) { write(value.as_double()); }
+	void write(const attotime& value) { write((float)value.as_double()); }
 	void write(void* data, size_t size) { m_stream.write(data, size); }
 	template <typename T> void write(const T& value) { write((void*)&value, (size_t)sizeof(T)); }
 
@@ -36,7 +36,7 @@ public:
 	void header(char a, char b, char c, char d);
 	void read(bool& value) { char c; read(c); value = c == (char)1; }
 	void read(std::string& value);
-	void read(attotime& value) { double d; read(d); value = attotime::from_double(d); }
+	void read(attotime& value) { float d; read(d); value = attotime::from_double(d); }
 	void read(void* data, size_t size) { m_stream.read(data, size); }
 	template <typename T> void read(T& value) { read((void*)&value, (size_t)sizeof(T)); }
 
