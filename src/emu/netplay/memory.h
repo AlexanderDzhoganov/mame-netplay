@@ -19,10 +19,9 @@ public:
 	void* data() const { return m_data; }
 	size_t size() const { return m_size; }
 	bool owns_memory() const { return m_owns_memory; }
+	unsigned int checksum();
 	void invalidate_checksum() { m_has_checksum = false; }
 	std::string debug_string();
-	
-	unsigned int checksum();
 
 private:
 	size_t m_size;

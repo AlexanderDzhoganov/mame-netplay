@@ -19,15 +19,15 @@
 #include "netplay/peer.h"
 #include "netplay/module_blacklist.h"
 
-#define BEGIN_PACKET(FLAGS)                         \
-	netplay_memory_stream stream;                     \
-	netplay_socket_writer writer(stream);             \
-	netplay_packet_write(writer, FLAGS, m_sync_generation);
-
-#define END_PACKET(ADDR) do {   \
-	m_socket->send(stream, ADDR); \
-	m_stats.m_packets_sent++;     \
+#define SEND_PACKET(FLAGS, ADDR, CODE) do { \
+	netplay_socket_writer packet; \
+	netplay_packet_write(packet, FLAGS, m_sync_generation); \
+	do { CODE } while(0); \
+	m_socket->send(packet.stream(), ADDR); \
+	m_stats.m_packets_sent++; \
 } while(0);
+
+#define PACKET_DATA(DATA) do { DATA.serialize(packet); } while(0);
 
 /* * *   TODO   * * *
  * - posix & win32 sockets
@@ -142,11 +142,10 @@ void netplay_manager::update_simulation()
 	if (m_waiting_for_peer)
 		return;
 
+	m_waiting_for_inputs = true;
+
 	if (!peer_inputs_available())
-	{
-		m_waiting_for_inputs = true;
 		return;
-	}
 
 	m_waiting_for_inputs = false;
 
@@ -159,7 +158,7 @@ void netplay_manager::update_simulation()
 
 void netplay_manager::recalculate_input_delay()
 {
-	if ((m_frame_count % 120 != 0) || m_peers.size() <= 1 || !m_set_delay.m_processed)
+	if ((m_frame_count % 60 != 0) || m_peers.size() <= 1 || !m_set_delay.m_processed)
 		return;
 
 	auto target_latency = 0.0;
@@ -208,10 +207,10 @@ void netplay_manager::recalculate_input_delay()
 	{
 		if (peer->self())
 			continue;
-
-		BEGIN_PACKET(NETPLAY_SET_DELAY);
-			m_set_delay.serialize(writer);
-		END_PACKET(peer->address());
+		
+		SEND_PACKET(NETPLAY_SET_DELAY, peer->address(), {
+			PACKET_DATA(m_set_delay);
+		});
 	}
 }
 
@@ -223,13 +222,13 @@ void netplay_manager::update_checksum_history()
 	auto& state = m_states.newest();
 
 	netplay_checksum* checksum = nullptr;
-	for (auto i = 0u; i < m_checksums_history.size(); i++)
+	for (auto& stored_checksum : m_checksums_history)
 	{
-		if (m_checksums_history[i].m_frame_count == state.m_frame_count)
-		{
-			checksum = &m_checksums_history[i];
-			break;
-		}
+		if (stored_checksum.m_frame_count != state.m_frame_count)
+			continue;
+
+		checksum = &stored_checksum;
+		break;
 	}
 
 	if (checksum == nullptr)
@@ -247,9 +246,8 @@ void netplay_manager::update_checksum_history()
 
 void netplay_manager::process_checksums()
 {
-	for (auto i = 0; i < m_checksums.size(); i++)
+	for (auto& checksum : m_checksums)
 	{
-		auto& checksum = m_checksums[i];
 		if (checksum.m_processed || checksum.m_frame_count >= m_frame_count)
 			continue;
 
@@ -267,7 +265,7 @@ void netplay_manager::send_checksums()
 	auto& state = m_states.newest();
 	auto& blocks = state.m_blocks;
 
-	BEGIN_PACKET(NETPLAY_CHECKSUM);
+	SEND_PACKET(NETPLAY_CHECKSUM, m_peers[1]->address(), {
 		netplay_checksum checksum;
 		checksum.m_frame_count = state.m_frame_count;
 		checksum.m_checksums.resize(blocks.size());
@@ -280,8 +278,8 @@ void netplay_manager::send_checksums()
 			checksum.m_checksums[i] = blocks[i]->checksum();
 		}
 
-		checksum.serialize(writer);
-	END_PACKET(m_peers[1]->address());
+		PACKET_DATA(checksum);
+	});
 }
 
 // create the next sync point
@@ -295,12 +293,13 @@ bool netplay_manager::store_state()
 	}
 
 	netplay_state* state = nullptr;
-	for (auto i = 0; i < m_states.size(); i++)
+	for (auto& stored_state : m_states)
 	{
-		if (m_states[i].m_frame_count == m_frame_count)
-		{
-			state = &m_states[i];
-		}
+		if (stored_state.m_frame_count != m_frame_count)
+			continue;
+
+		state = &stored_state;
+		break;
 	}
 
 	if (state == nullptr)
@@ -354,10 +353,8 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 	netplay_frame state_frame = 0;
 
 	// find the newest state we can rollback to
-	for (auto i = 0; i < m_states.size(); i++)
+	for (auto& state : m_states)
 	{
-		auto& state = m_states[i];
-
 		if (state.m_frame_count > before_frame)
 			continue;
 
@@ -428,11 +425,11 @@ void netplay_manager::send_sync(const netplay_peer& peer,	netplay_sync_reason re
 	auto& state = m_states.newest();
 	bool full_sync = reason == NETPLAY_SYNC_INITIAL || reason == NETPLAY_SYNC_RESYNC;
 
-	BEGIN_PACKET(NETPLAY_SYNC);
+	SEND_PACKET(NETPLAY_SYNC, peer.address(), {
 		netplay_sync sync;
 		sync.m_frame_count = state.m_frame_count;
 		sync.m_input_delay = m_input_delay;
-		sync.serialize(writer);
+		PACKET_DATA(sync);
 
 		for (auto i = 0; i < state.m_blocks.size(); i++)
 		{
@@ -448,11 +445,11 @@ void netplay_manager::send_sync(const netplay_peer& peer,	netplay_sync_reason re
 			good_block->copy_from(*block);
 
 			// add the block to the packet
-			netplay_packet_add_block(writer, *block);
+			netplay_packet_add_block(packet, *block);
 		}
 
-		m_stats.m_sync_total_bytes += writer.stream().cursor();
-	END_PACKET(peer.address());
+		m_stats.m_sync_total_bytes += packet.stream().cursor();
+	});
 
 	if (m_debug)
 	{
@@ -534,10 +531,6 @@ void netplay_manager::handle_handshake(const netplay_handshake& handshake, const
 {
 	// add the peer to our list and send the initial sync
 	auto& peer = add_peer(handshake.m_name, address);
-
-	if (m_debug)
-		NETPLAY_LOG("initial sync with %s at %d", peer.name().c_str(), m_frame_count);
-
 	send_sync(peer, NETPLAY_SYNC_INITIAL);
 }
 
@@ -572,8 +565,7 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 	store_state();
 
 	// acknowledge that we have caught up
-	BEGIN_PACKET(NETPLAY_SYNC);
-	END_PACKET(peer.address());
+	SEND_PACKET(NETPLAY_SYNC, peer.address(), {});
 }
 
 // handle inputs coming over the network
@@ -621,9 +613,8 @@ void netplay_manager::handle_checksum(const netplay_checksum& checksum, netplay_
 	auto& state = m_states.newest();
 	auto& blocks = state.m_blocks;
 
-	for (auto i = 0; i < m_checksums_history.size(); i++)
+	for (auto& my_checksum : m_checksums_history)
 	{
-		auto& my_checksum = m_checksums_history[i];
 		if (my_checksum.m_frame_count != checksum.m_frame_count)
 			continue;
 
@@ -668,11 +659,12 @@ bool netplay_manager::socket_connected(const netplay_addr& address)
 	add_peer("server", address);
 
 	// and send them the handshake
-	BEGIN_PACKET(NETPLAY_HANDSHAKE);
+	SEND_PACKET(NETPLAY_HANDSHAKE, address, {
 		netplay_handshake handshake;
 		handshake.m_name = "client";
-		handshake.serialize(writer);
-	END_PACKET(address);
+		PACKET_DATA(handshake);
+	});
+
 	return true;
 }
 
@@ -744,25 +736,25 @@ void netplay_manager::send_input_state(netplay_input& input_state)
 		if (m_host && m_frame_count % m_ping_every == 0)
 			flags |= NETPLAY_PING;
 
-		BEGIN_PACKET(flags)
-			input_state.serialize(writer);
+		SEND_PACKET(flags, peer->address(), {
+			PACKET_DATA(input_state);
 
 			if (flags & NETPLAY_PING)
 			{
-				writer.write(system_time());
+				packet.write(system_time());
 			}
 			else if (flags & NETPLAY_PONG)
 			{
-				writer.write(m_last_ping_time);
+				packet.write(m_last_ping_time);
 				m_has_ping_time = false;
 			}
-		END_PACKET(peer->address());
+		});
 	}
 }
 
 netplay_peer& netplay_manager::add_peer(const std::string& name, const netplay_addr& address, bool self)
 {
-	auto address_s = netplay_socket::addr_to_str(address);
+	auto addr = netplay_socket::addr_to_str(address);
 
 	std::shared_ptr<netplay_peer> existing_peer = nullptr;
 	for (auto it = m_peers.begin(); it != m_peers.end(); ++it)
@@ -770,8 +762,7 @@ netplay_peer& netplay_manager::add_peer(const std::string& name, const netplay_a
 		auto& peer = *it;
 		if (peer->address() == address)
 		{
-			NETPLAY_LOG("peer '%s' (address = '%s') has reconnected", name.c_str(), address_s.c_str());
-			machine().ui().popup_time(5, "Reconnected to '%s'.", name.c_str());
+			NETPLAY_LOG("peer '%s' (address = '%s') has reconnected", name.c_str(), addr.c_str());
 			existing_peer = peer;
 			m_peers.erase(it);
 			break;
@@ -779,9 +770,7 @@ netplay_peer& netplay_manager::add_peer(const std::string& name, const netplay_a
 	}
 
 	if (!existing_peer)
-	{
-		NETPLAY_LOG("got new peer '%s' (address = '%s')", name.c_str(), address_s.c_str());
-	}
+		NETPLAY_LOG("got new peer '%s' (address = '%s')", name.c_str(), addr.c_str());
 
 	machine().ui().popup_time(5, "Connected to '%s'.", name.c_str());
 	m_peers.push_back(std::make_shared<netplay_peer>(name, address, system_time(), self));
@@ -792,6 +781,8 @@ attotime netplay_manager::system_time() const
 {
 #ifdef EMSCRIPTEN
 	return attotime::from_double(emscripten_get_now() * 0.001);
+#else
+	return attotime::from_double((double)osd_ticks() / (double)osd_ticks_per_second());
 #endif
 }
 

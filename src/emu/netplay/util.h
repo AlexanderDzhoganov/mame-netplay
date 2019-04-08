@@ -67,6 +67,11 @@ public:
 		return m_buffer[index];
 	}
 
+	auto begin() { return std::begin(m_buffer); }
+	auto begin() const { return std::cbegin(m_buffer); }
+	auto end() { return std::begin(m_buffer) + m_size; }
+	auto end() const { return std::cbegin(m_buffer) + m_size; }
+
 private:
 	std::array<T, N> m_buffer;
 	size_t m_cursor;

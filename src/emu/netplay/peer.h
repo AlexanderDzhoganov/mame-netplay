@@ -60,7 +60,7 @@ public:
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
 	const netplay_ping_history& ping_history() const { return m_ping_history; }
 
-protected:
+private:
 	bool m_self;                             // whether this is our peer
 	std::string m_name;                      // the peer's self-specified name
 	netplay_addr m_address;                  // the peer's network address

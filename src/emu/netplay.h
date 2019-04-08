@@ -58,7 +58,6 @@ struct netplay_stats
 
 class netplay_manager
 {
-	friend class save_manager;
 	friend class ioport_manager;
 	friend class netplay_socket;
 
@@ -75,7 +74,6 @@ public:
 	const netplay_peerlist& peers() const { return m_peers; }
 	running_machine& machine() { return m_machine; }
 	attotime system_time() const;
-	void print_stats() const;
 
 private:
 	void update_simulation();
@@ -100,8 +98,8 @@ private:
 	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
 	bool peer_inputs_available() const;
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
+	void print_stats() const;
 
-protected:
 	// called by the socket implementation
 	bool socket_connected(const netplay_addr& address);
 	void socket_disconnected(const netplay_addr& address);
@@ -111,7 +109,6 @@ protected:
 	void send_input_state(netplay_input& input_state);
 	void next_frame() { m_frame_count++; }
 
-private:
 	running_machine& m_machine;
 
 	bool m_initialized;             // whether netplay is initialized

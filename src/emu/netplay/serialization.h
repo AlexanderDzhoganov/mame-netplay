@@ -7,7 +7,7 @@ template <typename Stream>
 class netplay_stream_writer
 {
 public:
-	netplay_stream_writer(Stream& stream) : m_stream(stream) {}
+	netplay_stream_writer() {}
 
 #ifdef NETPLAY_DEBUG
 	void header(char a, char b, char c, char d) { write(a); write(b); write(c); write(d); }
@@ -21,10 +21,10 @@ public:
 	void write(void* data, size_t size) { m_stream.write(data, size); }
 	template <typename T> void write(const T& value) { write((void*)&value, (size_t)sizeof(T)); }
 
-	Stream& stream() const { return m_stream; }
+	Stream& stream() { return m_stream; }
 
 private:
-	Stream& m_stream;
+	Stream m_stream;
 };
 
 template <typename Stream>
