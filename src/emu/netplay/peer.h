@@ -12,9 +12,7 @@ public:
 	bool operator() (const netplay_input_buffer& inputs, netplay_input& predicted, netplay_frame frame_index)
 	{
 		if (inputs.empty())
-		{
 			return false;
-		}
 
 		predicted = inputs.newest();
 		predicted.m_frame_index = frame_index;
@@ -32,8 +30,8 @@ public:
 	netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self = false);
 	
 	netplay_input& get_next_input_buffer();
-	netplay_input* get_inputs_for(netplay_frame frame_index);
-	netplay_input* get_predicted_inputs_for(netplay_frame frame_index);
+	netplay_input* inputs_for(netplay_frame frame_index);
+	netplay_input* predicted_inputs_for(netplay_frame frame_index);
 
 	template <typename Predictor>
 	netplay_input* predict_input_state(netplay_frame frame_index)
@@ -70,8 +68,7 @@ protected:
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	netplay_ping_history m_ping_history;     // latency measurements history
-	netplay_frame m_last_input_frame;
-	unsigned int m_next_packet_id;
+	netplay_frame m_last_input_frame;        // last frame when we've seen inputs from this peer
 };
 
 #endif

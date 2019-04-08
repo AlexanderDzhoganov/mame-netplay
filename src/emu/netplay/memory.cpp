@@ -56,10 +56,9 @@ netplay_memory::netplay_memory
 netplay_memory::~netplay_memory()
 {
 	netplay_assert(m_data != nullptr);
+
 	if (m_owns_memory)
-	{
 		delete [] m_data;
-	}
 }
 
 void netplay_memory::copy_from(const netplay_memory& block)
@@ -80,7 +79,7 @@ unsigned int netplay_memory::checksum()
 	return m_checksum;
 }
 
-std::string netplay_memory::get_debug_string()
+std::string netplay_memory::debug_string()
 {
 	std::stringstream ss;
 	ss << "memory block #" << m_index << " \"" << m_name << "\" @ " << (size_t)m_data;

@@ -2114,7 +2114,7 @@ g_profiler.start(PROFILER_INPUT);
 		for (auto& peer : netplay.peers())
 		{
 			// fetch this peer's inputs for frame (frame_index - input_delay)
-			auto inputs = peer->get_inputs_for(effective_frame);
+			auto inputs = peer->inputs_for(effective_frame);
 			if (inputs == nullptr)
 			{
 				inputs = peer->predict_input_state<netplay_dummy_predictor>(effective_frame);

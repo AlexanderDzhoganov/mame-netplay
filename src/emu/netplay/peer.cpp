@@ -1,7 +1,7 @@
 #include <string>
 #include <memory>
 
-#include "netplay/util.h"
+#include "attotime.h"
 #include "netplay.h"
 #include "netplay/input_state.h"
 #include "netplay/peer.h"
@@ -11,8 +11,7 @@ netplay_peer::netplay_peer(const std::string& name, const netplay_addr& address,
 	m_name(name),
 	m_address(address),
 	m_join_time(join_time),
-	m_last_input_frame(0),
-	m_next_packet_id(0)
+	m_last_input_frame(0)
 {
 	for (auto i = 0; i < m_inputs.capacity(); i++)
 		m_inputs.push_back(netplay_input());
@@ -27,7 +26,7 @@ netplay_input& netplay_peer::get_next_input_buffer()
 	return m_inputs.newest();
 }
 
-netplay_input* netplay_peer::get_inputs_for(netplay_frame frame_index)
+netplay_input* netplay_peer::inputs_for(netplay_frame frame_index)
 {
 	for (auto i = 0; i < m_inputs.size(); i++)
 	{
@@ -39,7 +38,7 @@ netplay_input* netplay_peer::get_inputs_for(netplay_frame frame_index)
 	return nullptr;
 }
 
-netplay_input* netplay_peer::get_predicted_inputs_for(netplay_frame frame_index)
+netplay_input* netplay_peer::predicted_inputs_for(netplay_frame frame_index)
 {
 	for (auto i = 0; i < m_predicted_inputs.size(); i++)
 	{

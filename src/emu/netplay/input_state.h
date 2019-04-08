@@ -66,9 +66,7 @@ struct netplay_input_port
 		writer.write((unsigned char)m_analog_ports.size());
 
 		for(auto& analog_port : m_analog_ports)
-		{
 			analog_port.serialize(writer);
-		}
 	}
 
 	template <typename StreamReader>
@@ -81,9 +79,7 @@ struct netplay_input_port
 		m_analog_ports.resize(num_analog_ports);
 
 		for(auto& analog_port : m_analog_ports)
-		{
 			analog_port.deserialize(reader);
-		}
 	}
 };
 
@@ -103,9 +99,7 @@ struct netplay_input
 		for (auto i = 0; i < m_ports.size(); i++)
 		{
 			if (m_ports[i] != input.m_ports[i])
-			{
 				return false;
-			}
 		}
 
 		return true;
@@ -123,9 +117,7 @@ struct netplay_input
 		writer.write((unsigned char)m_ports.size());
 
 		for(auto& port : m_ports)
-		{
 			port.serialize(writer);
-		}
 	}
 
 	template <typename StreamReader>
@@ -139,9 +131,7 @@ struct netplay_input
 		m_ports.resize(num_ports);
 
 		for(auto& port : m_ports)
-		{
 			port.deserialize(reader);
-		}
 	}
 
 	std::string debug_string() const;

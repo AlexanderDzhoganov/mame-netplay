@@ -108,19 +108,17 @@ struct netplay_set_delay
 };
 
 template <typename StreamWriter>
-void netplay_packet_write(StreamWriter& writer, unsigned int flags, unsigned int sync_generation, unsigned int packet_id)
+void netplay_packet_write(StreamWriter& writer, unsigned char flags, unsigned int sync_generation)
 {
 	writer.header('P', 'A', 'K', 'T');
-	writer.write(packet_id);
 	writer.write(sync_generation);
 	writer.write(flags);
 }
 
 template <typename StreamReader>
-void netplay_packet_read(StreamReader& reader, unsigned int& flags, unsigned int& sync_generation, unsigned int& packet_id)
+void netplay_packet_read(StreamReader& reader, unsigned char& flags, unsigned int& sync_generation)
 {
 	reader.header('P', 'A', 'K', 'T');
-	reader.read(packet_id);
 	reader.read(sync_generation);
 	reader.read(flags);
 }

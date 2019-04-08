@@ -6,8 +6,6 @@
 #include "netplay/serialization.h"
 #include "netplay/socket.h"
 
-// #define NETPLAY_COMPRESS
-
 struct netplay_socket_impl
 {
   std::vector<char> m_scratchpad;
@@ -59,7 +57,6 @@ netplay_status netplay_socket::disconnect(const netplay_addr& address)
 
 netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay_addr& address)
 {
-#ifdef NETPLAY_COMPRESS
   auto& data = stream.data();
   size_t orig_size = data.size();
 
@@ -80,11 +77,6 @@ netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay
   EM_ASM_ARGS({
 		jsmame_netplay_packet($0, $1, $2);
   }, (unsigned int)compressed.data(), (unsigned int)compressed_size, (unsigned int)address.m_peerid.c_str());
-#else
-  EM_ASM_ARGS({
-		jsmame_netplay_packet($0, $1, $2);
-  }, (unsigned int)stream.data().data(), (unsigned int)stream.data().size(), (unsigned int)address.m_peerid.c_str());
-#endif
   
 	return NETPLAY_NO_ERR;
 }
@@ -101,7 +93,6 @@ void netplay_socket::socket_disconnected(const netplay_addr& address)
 
 void netplay_socket::socket_data(char* data, int length, char* sender)
 {
-#ifdef NETPLAY_COMPRESS
   size_t orig_size;
   memcpy(&orig_size, data, sizeof(size_t));
  
@@ -119,10 +110,6 @@ void netplay_socket::socket_data(char* data, int length, char* sender)
   }
 
   netplay_raw_byte_stream stream(scratchpad.data(), orig_size);
-#else
-  netplay_raw_byte_stream stream(data, length);
-#endif
-
   netplay_socket_reader reader(stream);
   m_manager.socket_data(reader, netplay_socket::str_to_addr(sender));
 }

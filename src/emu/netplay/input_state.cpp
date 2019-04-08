@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 
 #include "attotime.h"
 #include "netplay.h"

@@ -79,20 +79,18 @@ public:
 
 private:
 	void update_simulation();
-	void perform_rollback();
 	void recalculate_input_delay();
 	void update_checksum_history();
 	void process_checksums();
 	void send_checksums();
+	void send_sync(const netplay_peer& peer, netplay_sync_reason reason);
 
 	bool store_state();
 	void load_state(const netplay_state& state);
 	bool rollback(netplay_frame before_frame);
 
-	void send_sync(const netplay_peer& peer, netplay_sync_reason reason);
-
-	void handle_host_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
-	void handle_client_packet(netplay_socket_reader& reader, unsigned int flags, const netplay_addr& sender);
+	void handle_host_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
+	void handle_client_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
 	void handle_handshake(const netplay_handshake& handshake, const netplay_addr& address);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
 	void handle_inputs(netplay_input& input_state, netplay_peer& peer);
@@ -119,37 +117,31 @@ private:
 	bool m_initialized;             // whether netplay is initialized
 	bool m_debug;                   // whether debug logging for netplay is enabled
 	bool m_host;                    // whether this node is the host
-	size_t m_max_block_size;        // maximum memory block size, blocks larger than this get split up
+	size_t m_max_block_size;        // maximum memory block size. blocks larger than this get split up
 	unsigned int m_input_delay_min; // minimum input delay
 	unsigned int m_input_delay_max; // maximum input delay
-	unsigned int m_input_delay;     // how many frames of input delay to use, higher numbers result in less rollbacks
+	unsigned int m_input_delay;     // how many frames of input delay to use. higher numbers result in less rollbacks
 	unsigned int m_checksum_every;  // how often to send checksum checks
 	unsigned int m_ping_every;      // how often to send pings
 	unsigned int m_max_rollback;    // maximum number of frames we're allowed to rollback
 
 	netplay_peerlist m_peers;       // connected peers
 
-	netplay_blocklist m_memory;     // active (in-use) memory blocks by the emulator
+	netplay_blocklist m_memory;     // memory blocks in-use by the emulator
 	netplay_statelist m_states;     // saved emulator states
 	netplay_state m_good_state;     // last known good state acknowledged between all peers
 
 	unsigned int m_sync_generation; // we increment this every time we do a sync
-	unsigned int m_next_packet_id;
+	netplay_frame m_frame_count;    // current frame (update) count
 
 	bool m_catching_up;             // are we catching up?
 	bool m_waiting_for_peer;        // are we waiting on a peer to sync?
 	bool m_waiting_for_inputs;      // are we waiting for inputs?
 
-	bool m_initial_sync;            // (client only) whether the initial sync has completed
-	bool m_rollback;                // are we rolling back this update?
-	netplay_frame m_rollback_frame; // where to rollback to
-	netplay_frame m_frame_count;    // current frame (update) count
-
-	bool m_has_ping_time;           // has a buffered ping request
+	bool m_has_ping_time;           // whether we have a buffered ping request
 	attotime m_last_ping_time;      // system time of the buffered ping request
 
-	attotime m_startup_time;        // time since startup
-	netplay_stats m_stats;          // various debugging stats
+	netplay_stats m_stats;          // various collected stats
 	netplay_checksums m_checksums;  // pending checksums
 	netplay_checksums m_checksums_history;
 	netplay_set_delay m_set_delay;
