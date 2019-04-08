@@ -114,6 +114,7 @@ private:
 	bool m_initialized;             // whether netplay is initialized
 	bool m_debug;                   // whether debug logging for netplay is enabled
 	bool m_host;                    // whether this node is the host
+	netplay_addr m_host_address;    // the network address of the host
 	size_t m_max_block_size;        // maximum memory block size. blocks larger than this get split up
 	unsigned int m_input_delay_min; // minimum input delay
 	unsigned int m_input_delay_max; // maximum input delay

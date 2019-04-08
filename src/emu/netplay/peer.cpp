@@ -6,6 +6,43 @@
 #include "netplay/input_state.h"
 #include "netplay/peer.h"
 
+netplay_latency_estimator::netplay_latency_estimator() :
+	m_exp_alpha(0.15),
+	m_last_avg_value(50.0f)
+{
+	// add an initial sample of 50ms
+	m_history.push_back(50.0f);
+}
+
+void netplay_latency_estimator::add_sample(float latency_ms)
+{
+	latency_ms = std::max(1.0f, std::min(250.0f, latency_ms));
+	m_history.push_back(latency_ms);
+}
+
+float netplay_latency_estimator::predicted_latency()
+{
+	float avg = m_last_avg_value;
+	float high = 0.0f;
+	float low = 250.0f;
+
+	for (auto& sample : m_history)
+	{
+		if (sample > high)
+			high = sample;
+		if (sample < low)
+			low = sample;
+
+		// exponential moving average
+		avg = sample * m_exp_alpha + avg * (1.0f - m_exp_alpha);
+	}
+
+	m_last_avg_value = avg;
+
+	float confidence = 1.0f - (high - low) / 250.0f;
+	return avg * confidence + high * (1.0f - confidence);
+}
+
 netplay_peer::netplay_peer(const std::string& name, const netplay_addr& address, attotime join_time, bool self) :
 	m_self(self),
 	m_name(name),
@@ -48,27 +85,4 @@ netplay_input* netplay_peer::predicted_inputs_for(netplay_frame frame_index)
 	}
 
 	return nullptr;
-}
-
-double netplay_peer::average_latency()
-{
-	double avg_latency = 0.0;
-
-	for (auto i = 0; i < m_ping_history.size(); i++)
-	{
-		avg_latency += m_ping_history[i];
-	}
-
-	avg_latency /= (double)m_ping_history.size();
-	return avg_latency;
-}
-
-double netplay_peer::highest_latency()
-{
-	double highest_latency = 0.0;
-
-	for (auto i = 0; i < m_ping_history.size(); i++)
-		highest_latency = std::max(m_ping_history[i], highest_latency);
-
-	return highest_latency;
 }

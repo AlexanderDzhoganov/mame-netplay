@@ -2,7 +2,7 @@
 #define MAME_EMU_NETPLAY_PEER_H
 
 typedef netplay_circular_buffer<netplay_input, 30> netplay_input_buffer;
-typedef netplay_circular_buffer<double, 15> netplay_ping_history;
+typedef netplay_circular_buffer<float, 180> netplay_latency_samples;
 
 // this is the trivial imput predictor
 // it simply repeats the previous frame inputs
@@ -18,6 +18,20 @@ public:
 		predicted.m_frame_index = frame_index;
 		return true;
 	}
+};
+
+class netplay_latency_estimator
+{
+	public:
+	netplay_latency_estimator();
+
+	void add_sample(float latency_ms);
+	float predicted_latency();
+
+	private:
+	netplay_latency_samples m_history;
+	float m_exp_alpha;
+	float m_last_avg_value;
 };
 
 class netplay_peer
@@ -48,17 +62,13 @@ public:
 		return nullptr;
 	}
 
-	double average_latency();
-	double highest_latency();
-	void add_latency_measurement(double latency) { m_ping_history.push_back(latency); }
-
 	bool self() const { return m_self; }
 	const std::string& name() const { return m_name; }
 	attotime join_time() const { return m_join_time; }
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
-	const netplay_ping_history& ping_history() const { return m_ping_history; }
+	netplay_latency_estimator& latency_estimator() { return m_latency_estimator; }
 
 private:
 	bool m_self;                             // whether this is our peer
@@ -67,8 +77,8 @@ private:
 	attotime m_join_time;                    // when the peer joined
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
-	netplay_ping_history m_ping_history;     // latency measurements history
 	netplay_frame m_last_input_frame;        // last frame when we've seen inputs from this peer
+	netplay_latency_estimator m_latency_estimator;
 };
 
 #endif

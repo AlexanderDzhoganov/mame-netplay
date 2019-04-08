@@ -29,12 +29,6 @@
 
 #define PACKET_DATA(DATA) do { DATA.serialize(packet); } while(0);
 
-/* * *   TODO   * * *
- * - posix & win32 sockets
- * - support more than 1 client
- * - input remapping
- */
-
 //-------------------------------------------------
 // netplay_manager
 //-------------------------------------------------
@@ -56,13 +50,16 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	// configuration options
 	m_debug = opts.netplay_debug();               // netplay debug printing
 	m_host = strlen(host_address) == 0;           // is this node the host
+	if (!m_host)
+		m_host_address = netplay_socket::str_to_addr(host_address);
+
 	m_max_block_size = opts.netplay_block_size(); // 1kb max block size
 	m_input_delay_min = 2;                        // minimum input delay
 	m_input_delay_max = 20;                       // maximum input delay
 	m_input_delay = 5;                            // use N frames of input delay
 	m_checksum_every = 31;                        // checksum every N frames
 	m_ping_every = 7;                             // ping every N frames
-	m_max_rollback = 4;                           // max rollback of N frames
+	m_max_rollback = 3;                           // max rollback of N frames
 
 	for (auto i = 0; i < m_states.capacity(); i++)
 		m_states.push_back(netplay_state());
@@ -80,7 +77,6 @@ bool netplay_manager::initialize()
 		create_memory_block(entry->m_module, entry->m_name, entry->m_data, entry->m_typecount * entry->m_typesize);
 
 	m_socket = std::make_unique<netplay_socket>(*this);
-
 	add_peer(m_host ? "server" : "client", m_socket->get_self_address(), true);
 
 	if (m_host)
@@ -94,9 +90,7 @@ bool netplay_manager::initialize()
 	}
 	else
 	{
-		auto host_string = machine().options().netplay_host();
-		netplay_addr address = netplay_socket::str_to_addr(host_string);
-		if (m_socket->connect(address) != NETPLAY_NO_ERR)
+		if (m_socket->connect(m_host_address) != NETPLAY_NO_ERR)
 		{
 			NETPLAY_LOG("socket failed to connect");
 			return false;
@@ -158,10 +152,10 @@ void netplay_manager::update_simulation()
 
 void netplay_manager::recalculate_input_delay()
 {
-	if ((m_frame_count % 60 != 0) || m_peers.size() <= 1 || !m_set_delay.m_processed)
+	if ((m_frame_count % 20 != 0) || m_peers.size() <= 1 || !m_set_delay.m_processed)
 		return;
 
-	auto target_latency = 0.0;
+	float target_latency = 0.0f;
 
 	// find the peer with the highest latency
 	for (auto& peer : m_peers)
@@ -169,36 +163,23 @@ void netplay_manager::recalculate_input_delay()
 		if (peer->self())
 			continue;
 		
-		auto avg_latency = peer->average_latency();
-		auto highest_latency = peer->highest_latency();
+		auto avg_latency = peer->latency_estimator().predicted_latency();
 
-		if (highest_latency > m_stats.m_max_latency)
-			m_stats.m_max_latency = (unsigned int)highest_latency;
-
-		// if the highest latency is more than 4/3rds the average latency
-		// take the highest latency as a target
-		if ((4.0 / 3.0) * avg_latency < highest_latency)
-			avg_latency = highest_latency;
+		if (avg_latency > m_stats.m_max_latency)
+			m_stats.m_max_latency = avg_latency;
 
 		target_latency = std::max(target_latency, avg_latency);
 	}
 
 	// adjust the input delay
-	auto calculated_delay = (unsigned int)(target_latency / (1000.0 / 60.0));
-
-	auto input_delay = m_input_delay;
-	if (calculated_delay < input_delay)
-		input_delay--;
-	else if (calculated_delay > input_delay)
-		input_delay++;
-
+	auto input_delay = (unsigned int)(target_latency / (1000.0f / 60.0f)) + 1;
 	input_delay = std::max(m_input_delay_min, std::min(input_delay, m_input_delay_max));
 
 	if (m_input_delay == input_delay)
 		return;
 
 	m_set_delay.m_input_delay = input_delay;
-	m_set_delay.m_frame_count = m_frame_count + 2 * m_input_delay;
+	m_set_delay.m_frame_count = m_frame_count + input_delay;
 	m_set_delay.m_processed = false;
 
 	NETPLAY_LOG("setting input delay to '%d'", input_delay);
@@ -478,11 +459,8 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, unsigned
 			// multiply by 1000 to get milliseconds
 			auto latency = (system_time() - ping_time).as_double() * 1000.0;
 
-			// clamp the latency to a reasonable value (1ms-250ms) to remove outliers
-			latency = std::max(1.0, std::min(latency, 250.0));
-
-			// add new latency measurement for this peer
-			peer.add_latency_measurement(latency);
+			// record the new latency measurement
+			peer.latency_estimator().add_sample(latency);
 		}
 	}
 	else if (flags & NETPLAY_CHECKSUM)
@@ -589,7 +567,7 @@ void netplay_manager::handle_inputs(netplay_input& input_state, netplay_peer& pe
 	if (rollback(effective_frame))
 		return;
 
-	if (m_host)
+	/*if (m_host)
 	{
 		// failing a rollback means we're most likely desynced by a large margin
 		// best we can do is send a full sync to all clients
@@ -602,7 +580,7 @@ void netplay_manager::handle_inputs(netplay_input& input_state, netplay_peer& pe
 			
 			send_sync(*peer, NETPLAY_SYNC_RESYNC);
 		}
-	}
+	}*/
 }
 
 void netplay_manager::handle_checksum(const netplay_checksum& checksum, netplay_peer& peer)
