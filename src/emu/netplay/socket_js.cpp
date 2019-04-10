@@ -75,7 +75,7 @@ netplay_status netplay_socket::disconnect(const netplay_addr& address)
 	return NETPLAY_NO_ERR;
 }
 
-netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay_addr& address)
+netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay_addr& address, bool reliable)
 {
   auto compressed_size = m_impl->compress(stream);
   if(compressed_size == 0)
@@ -86,13 +86,18 @@ netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay
   }
   
   EM_ASM_ARGS({
-		jsmame_netplay_packet($0, $1, $2);
-  }, (unsigned int)m_impl->m_scratchpad.data(), (unsigned int)compressed_size, (unsigned int)address.m_peerid.c_str());
+      jsmame_netplay_packet($0, $1, $2, $3);
+    },
+    (unsigned int)m_impl->m_scratchpad.data(),
+    (unsigned int)compressed_size,
+    (unsigned int)address.m_peerid.c_str(),
+    (unsigned int)reliable 
+  );
   
 	return NETPLAY_NO_ERR;
 }
 
-netplay_status netplay_socket::broadcast(netplay_memory_stream& stream)
+netplay_status netplay_socket::broadcast(netplay_memory_stream& stream, bool reliable)
 {
   auto compressed_size = m_impl->compress(stream);
   if(compressed_size == 0)
@@ -103,8 +108,12 @@ netplay_status netplay_socket::broadcast(netplay_memory_stream& stream)
   }
   
   EM_ASM_ARGS({
-		jsmame_netplay_broadcast($0, $1);
-  }, (unsigned int)m_impl->m_scratchpad.data(), (unsigned int)compressed_size);
+      jsmame_netplay_broadcast($0, $1, $2);
+    },
+    (unsigned int)m_impl->m_scratchpad.data(),
+    (unsigned int)compressed_size,
+    (unsigned int)reliable
+  );
   
 	return NETPLAY_NO_ERR;
 }

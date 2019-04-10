@@ -44,6 +44,8 @@ struct netplay_stats
 	unsigned int m_rollback_success;
 	unsigned int m_rollback_fail;
 	unsigned int m_max_latency;
+	unsigned int m_avg_latency_sum;
+	unsigned int m_avg_latency_n;
 	unsigned int m_packets_received;
 	unsigned int m_packets_sent;
 };

@@ -217,3 +217,10 @@ return {
 window.jsmame_set_mastervolume = jsmame_web_audio.set_mastervolume;
 window.jsmame_update_audio_stream = jsmame_web_audio.update_audio_stream;
 window.jsmame_sample_count = jsmame_web_audio.sample_count;
+
+Module.print = function (text) {
+	window.jsmame_stdout(text, false)
+}
+Module.printErr = function (text) {
+	window.jsmame_stdout(text, true)
+}

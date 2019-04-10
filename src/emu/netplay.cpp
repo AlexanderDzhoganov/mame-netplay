@@ -26,7 +26,7 @@
 	m_stats.m_packets_sent++;           \
 } while(0);
 
-#define SEND_TO(ADDR) m_socket->send(packet.stream(), ADDR);
+#define SEND_TO(ADDR, RELIABLE) m_socket->send(packet.stream(), ADDR, RELIABLE);
 
 #define DATA(DATA) do { DATA.serialize(packet); } while(0);
 
@@ -195,7 +195,7 @@ void netplay_manager::wait_for_connection()
 			netplay_ready ready;
 			ready.m_name = m_name;
 			DATA(ready);
-			SEND_TO(m_peers[0]->address());
+			SEND_TO(m_peers[0]->address(), true);
 		});
 
 		m_waiting_for_connection = false;
@@ -218,6 +218,8 @@ void netplay_manager::recalculate_input_delay()
 			continue;
 		
 		auto avg_latency = peer->latency_estimator().predicted_latency();
+		m_stats.m_avg_latency_sum += (unsigned int)avg_latency;
+		m_stats.m_avg_latency_n++;
 
 		if (avg_latency > m_stats.m_max_latency)
 			m_stats.m_max_latency = avg_latency;
@@ -241,7 +243,7 @@ void netplay_manager::recalculate_input_delay()
 	netplay_socket_writer packet;
 	write_packet_header(packet, NETPLAY_SET_DELAY);
 	m_set_delay.serialize(packet);
-	m_socket->broadcast(packet.stream());
+	m_socket->broadcast(packet.stream(), true);
 }
 
 void netplay_manager::update_checksum_history()
@@ -318,7 +320,7 @@ void netplay_manager::send_checksums()
 		}
 
 		DATA(checksum);
-		SEND_TO(m_peers[0]->address());
+		SEND_TO(m_peers[0]->address(), false);
 	});
 }
 
@@ -484,7 +486,7 @@ void netplay_manager::send_sync(bool full_sync)
 		netplay_packet_add_block(packet, *block);
 	}
 
-	m_socket->broadcast(packet.stream());
+	m_socket->broadcast(packet.stream(), true);
 	m_stats.m_sync_total_bytes += packet.stream().cursor();
 	m_stats.m_packets_sent += m_peers.size() - 1;
 	
@@ -635,7 +637,7 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 
 	// acknowledge that we have caught up
 	PACKET(NETPLAY_SYNC, {
-		SEND_TO(peer.address());
+		SEND_TO(peer.address(), true);
 	});
 }
 
@@ -754,7 +756,7 @@ bool netplay_manager::host_socket_connected(const netplay_addr& address)
 		}
 
 		DATA(handshake);
-		SEND_TO(address);
+		SEND_TO(address, true);
 	});
 	return true;
 }
@@ -840,7 +842,7 @@ void netplay_manager::send_input_state(netplay_input& input_state)
 	write_packet_header(packet, NETPLAY_INPUTS);
 	input_state.serialize(packet);
 
-	m_socket->broadcast(packet.stream());
+	m_socket->broadcast(packet.stream(), false);
 	m_stats.m_packets_sent += m_peers.size() - 1;
 }
 
@@ -1046,7 +1048,11 @@ void netplay_manager::print_stats() const
 	ss << "failed rollbacks = " << m_stats.m_rollback_fail << "\n";
 	
 	if (m_host)
+	{
+		auto avg_latency = m_stats.m_avg_latency_sum / m_stats.m_avg_latency_n;
+		ss << "avg latency = " << avg_latency << "ms\n";
 		ss << "max latency = " << m_stats.m_max_latency << "ms\n";
+	}
 	
 	ss << "packets sent = " << m_stats.m_packets_sent << "\n";
 	ss << "packets received = " << m_stats.m_packets_received << "\n";

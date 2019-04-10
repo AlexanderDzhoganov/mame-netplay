@@ -3,12 +3,14 @@
 
 enum netplay_packet_flags
 {
+	// reliable
 	NETPLAY_HANDSHAKE  = 1 << 0, // handshake
 	NETPLAY_READY      = 1 << 1, // client ready
 	NETPLAY_SYNC       = 1 << 2, // sync data
-	NETPLAY_INPUTS     = 1 << 3, // player inputs
-	NETPLAY_CHECKSUM   = 1 << 4, // memory checksum
-	NETPLAY_SET_DELAY  = 1 << 5  // set input delay
+	NETPLAY_SET_DELAY  = 1 << 3,  // set input delay
+	// unreliable
+	NETPLAY_INPUTS     = 1 << 4, // player inputs
+	NETPLAY_CHECKSUM   = 1 << 5  // memory checksum
 };
 
 struct netplay_handshake

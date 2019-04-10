@@ -25,8 +25,8 @@ public:
 	netplay_status listen(const netplay_listen_socket& listen_opts);
 	netplay_status connect(const netplay_addr& address);
 	netplay_status disconnect(const netplay_addr& address);
-	netplay_status send(netplay_memory_stream& stream, const netplay_addr& address);
-	netplay_status broadcast(netplay_memory_stream& stream);
+	netplay_status send(netplay_memory_stream& stream, const netplay_addr& address, bool reliable);
+	netplay_status broadcast(netplay_memory_stream& stream, bool reliable);
 
 	bool socket_connected(const netplay_addr& address);
 	void socket_disconnected(const netplay_addr& address);
