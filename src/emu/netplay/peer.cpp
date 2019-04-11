@@ -7,7 +7,7 @@
 #include "netplay/peer.h"
 
 netplay_latency_estimator::netplay_latency_estimator() :
-	m_exp_alpha(0.55f),
+	m_exp_alpha(0.05f),
 	m_last_avg_value(50.0f)
 {
 	// add an initial sample of 50ms
@@ -52,7 +52,6 @@ netplay_peer::netplay_peer(const netplay_addr& address, attotime join_time, bool
 	m_name("peer"),
 	m_address(address),
 	m_join_time(join_time),
-	m_last_input_frame(0),
 	m_last_system_time(0, 0)
 {
 	for (auto i = 0; i < m_inputs.capacity(); i++)

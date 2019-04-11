@@ -1,8 +1,8 @@
 #ifndef MAME_EMU_NETPLAY_PEER_H
 #define MAME_EMU_NETPLAY_PEER_H
 
-typedef netplay_circular_buffer<netplay_input, 30> netplay_input_buffer;
-typedef netplay_circular_buffer<float, 300> netplay_latency_samples;
+typedef netplay_circular_buffer<netplay_input, 60> netplay_input_buffer;
+typedef netplay_circular_buffer<float, 100> netplay_latency_samples;
 
 // this is the trivial input predictor
 // it simply repeats the previous frame inputs
@@ -45,6 +45,7 @@ enum netplay_peer_state
 class netplay_peer
 {
 	friend class netplay_manager;
+	friend class ioport_manager;
 
 	DISABLE_COPYING(netplay_peer);
 
@@ -90,7 +91,6 @@ private:
 	attotime m_join_time;                    // when the peer joined
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
-	netplay_frame m_last_input_frame;        // last frame when we've seen inputs from this peer
 	attotime m_last_system_time;             // the last system time we've received from this peer
 	netplay_latency_estimator m_latency_estimator;
 };

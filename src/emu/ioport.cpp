@@ -2042,9 +2042,7 @@ g_profiler.start(PROFILER_INPUT);
 	bool netplay_active = machine().netplay_active();
 
 	if (netplay_active)
-	{
 		machine().netplay().next_frame();
-	}
 
 	playback_frame(curtime);
 	record_frame(curtime);
@@ -2071,9 +2069,17 @@ g_profiler.start(PROFILER_INPUT);
 		auto peer = netplay.my_peer();
 		if (peer != nullptr)
 		{
-			net_input = &(peer->get_next_input_buffer());
-			net_input->m_frame_index = netplay.m_frame_count + netplay.m_input_delay;
-			net_input->m_ports.clear();
+			auto effective_frame = netplay.m_frame_count + netplay.m_input_delay;
+			auto existing_input = peer->inputs_for(effective_frame);
+
+			// we only record new inputs if there aren't any existing ones for the target frame
+			// this could happen whenever we switch to a lower input delay
+			if (existing_input == nullptr)
+			{
+				net_input = &(peer->get_next_input_buffer());
+				net_input->m_frame_index = effective_frame;
+				net_input->m_ports.clear();
+			}
 		}
 	}
 
@@ -2089,10 +2095,9 @@ g_profiler.start(PROFILER_INPUT);
 			if (net_input != nullptr)
 			{
 				auto& net_port = net_input->add_input_port(live_port.digital);
+
 				for (auto& analog : live_port.analoglist)
-				{
 					net_port.add_analog_port(analog.m_accum, analog.m_previous);
-				}
 			}
 
 			// clear all inputs so we can overwrite them with the synced ones
@@ -2110,7 +2115,7 @@ g_profiler.start(PROFILER_INPUT);
 	{
 		auto& netplay = machine().netplay();
 
-		// then we'll apply inputs and try to predict the ones we are missing
+		// we'll apply the known inputs and try to predict the ones we are missing
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
@@ -2118,9 +2123,10 @@ g_profiler.start(PROFILER_INPUT);
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr)
 			{
-				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
+				NETPLAY_LOG("no inputs for %d (peer = %s)", netplay.m_frame_count, peer->name().c_str());
+				/*inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 				if (inputs == nullptr)
-					continue;
+					continue;*/
 			}
 
 			// merge the inputs with the emulator ones
@@ -2163,7 +2169,6 @@ void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
 
 void ioport_manager::netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port)
 {
-	// NETPLAY TODO: separate per peer mappings
 	live_port.digital |= net_port.m_digital;
 
 	auto analog_index = 0u;

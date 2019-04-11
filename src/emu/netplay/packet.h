@@ -7,6 +7,7 @@ enum netplay_packet_flags
 	NETPLAY_HANDSHAKE  = 1 << 0, // handshake
 	NETPLAY_READY      = 1 << 1, // client ready
 	NETPLAY_SYNC       = 1 << 2, // sync data
+	NETPLAY_DELAY      = 1 << 3, // set a new input delay
 	// unreliable
 	NETPLAY_INPUTS     = 1 << 4, // player inputs
 	NETPLAY_CHECKSUM   = 1 << 5  // memory checksum
@@ -75,14 +76,12 @@ struct netplay_ready
 struct netplay_sync
 {
 	netplay_frame m_frame_count; // frame count at sync
-	unsigned int m_input_delay;  // current input delay value
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
 	{
 		writer.header('S', 'Y', 'N', 'C');
 		writer.write(m_frame_count);
-		writer.write(m_input_delay);
 	}
 
 	template <typename StreamReader>
@@ -90,6 +89,32 @@ struct netplay_sync
 	{
 		reader.header('S', 'Y', 'N', 'C');
 		reader.read(m_frame_count);
+	}
+};
+
+struct netplay_delay
+{
+	netplay_frame m_effective_frame;
+	unsigned char m_input_delay;
+
+	// non serialized
+	bool m_processed;
+
+	netplay_delay() : m_effective_frame(0), m_input_delay(0), m_processed(true) {}
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.header('D', 'L', 'A', 'Y');
+		writer.write(m_effective_frame);
+		writer.write(m_input_delay);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.header('D', 'L', 'A', 'Y');
+		reader.read(m_effective_frame);
 		reader.read(m_input_delay);
 	}
 };

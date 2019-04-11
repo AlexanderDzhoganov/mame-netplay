@@ -73,7 +73,7 @@ public:
 private:
 	bool update_simulation();
 	void wait_for_connection();
-	bool recalculate_input_delay();
+	void recalculate_input_delay();
 	void update_checksum_history();
 	void process_checksums();
 	void send_checksums();
@@ -145,6 +145,8 @@ private:
 	netplay_stats m_stats;          // various collected stats
 	netplay_checksums m_checksums;  // pending checksums
 	netplay_checksums m_checksum_history;
+	netplay_delay m_next_input_delay;
+	unsigned int m_input_delay_backoff;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 };

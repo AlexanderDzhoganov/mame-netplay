@@ -32,7 +32,15 @@ public:
 			m_size++;
 	}
 
-	void advance(int offset) { m_cursor = (m_cursor + offset) % N; }
+	void advance(unsigned int offset) { m_cursor = (m_cursor + offset) % N; }
+	void rewind(unsigned int offset)
+	{
+		while (offset > m_cursor)
+			m_cursor += m_size;
+
+		m_cursor -= offset;
+	}
+
 	bool empty() const { return m_size == 0; }
 	size_t size() const { return m_size; }
 	size_t capacity() const { return N; }
