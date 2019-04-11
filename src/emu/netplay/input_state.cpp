@@ -27,6 +27,7 @@ std::string netplay_input::debug_string() const
 	std::stringstream ss;
 
 	ss << "input buffer\n";
+	ss << "frame_index = " << m_frame_index << "\n";
 	ss << "num_ports = " << m_ports.size() << "\n";
 
 	for (auto i = 0; i < m_ports.size(); i++)

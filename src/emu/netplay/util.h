@@ -49,6 +49,20 @@ public:
 		return m_buffer[m_cursor];
 	}
 
+	const T& peek(int offset) const {
+		int cursor = (int)m_cursor + offset;
+		if (cursor < 0)
+		{
+			cursor = m_size + cursor;
+		}
+
+		cursor %= m_size;
+		netplay_assert(cursor >= 0);
+		netplay_assert(cursor < m_size);
+
+		return m_buffer[cursor];
+	}
+
 	const T& newest() const
 	{
 		netplay_assert(m_cursor < m_size);

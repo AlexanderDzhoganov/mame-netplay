@@ -2,9 +2,9 @@
 #define MAME_EMU_NETPLAY_PEER_H
 
 typedef netplay_circular_buffer<netplay_input, 30> netplay_input_buffer;
-typedef netplay_circular_buffer<float, 180> netplay_latency_samples;
+typedef netplay_circular_buffer<float, 300> netplay_latency_samples;
 
-// this is the trivial imput predictor
+// this is the trivial input predictor
 // it simply repeats the previous frame inputs
 class netplay_dummy_predictor
 {

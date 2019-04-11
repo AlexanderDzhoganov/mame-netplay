@@ -2045,11 +2045,9 @@ g_profiler.start(PROFILER_INPUT);
 	{
 		machine().netplay().next_frame();
 	}
-	else
-	{
-		playback_frame(curtime);
-		record_frame(curtime);
-	}
+
+	playback_frame(curtime);
+	record_frame(curtime);
 
 	// track the duration of the previous frame
 	m_last_delta_nsec = (curtime - m_last_frame_time).as_attoseconds() / ATTOSECONDS_PER_NANOSECOND;
@@ -2067,13 +2065,14 @@ g_profiler.start(PROFILER_INPUT);
 		port.second->update_defvalue(false);
 
 	netplay_input* net_input = nullptr;
-	if (netplay_active && !machine().netplay().waiting())
+	if (netplay_active && !machine().netplay().m_catching_up)
 	{
-		auto peer = machine().netplay().my_peer();
+		auto& netplay = machine().netplay();
+		auto peer = netplay.my_peer();
 		if (peer != nullptr)
 		{
 			net_input = &(peer->get_next_input_buffer());
-			net_input->m_frame_index = machine().netplay().frame_count();
+			net_input->m_frame_index = netplay.m_frame_count + netplay.m_input_delay;
 			net_input->m_ports.clear();
 		}
 	}
@@ -2110,17 +2109,16 @@ g_profiler.start(PROFILER_INPUT);
 	if (netplay_active)
 	{
 		auto& netplay = machine().netplay();
-		auto effective_frame = netplay.frame_count() - netplay.input_delay();
 
 		// then we'll apply inputs and try to predict the ones we are missing
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
-			// fetch this peer's inputs for frame (frame_index - input_delay)
-			auto inputs = peer->inputs_for(effective_frame);
+			// fetch this peer's inputs
+			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr)
 			{
-				inputs = peer->predict_input_state<netplay_dummy_predictor>(effective_frame);
+				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 				if (inputs == nullptr)
 					continue;
 			}
@@ -2136,7 +2134,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// finally submit my input state for sending
 		if (net_input != nullptr)
-			netplay.send_input_state(*net_input);
+			netplay.send_input_state();
 	}
 
 	// loop over all input ports

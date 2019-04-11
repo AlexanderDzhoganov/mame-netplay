@@ -13,6 +13,7 @@ inline bool netplay_is_blacklisted(unsigned int module_hash)
   switch (module_hash)
   {
     MODULE(0x03962e98) // QSound (HLE)
+    MODULE(0xb9eadb6a) // Yamaha
   }
 
   return false;

@@ -34,7 +34,7 @@ struct netplay_state
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
-typedef netplay_circular_buffer<netplay_state, 3> netplay_statelist;
+typedef netplay_circular_buffer<netplay_state, 4> netplay_statelist;
 typedef netplay_circular_buffer<netplay_checksum, 20> netplay_checksums;
 
 struct netplay_stats
@@ -71,9 +71,9 @@ public:
 	netplay_peer* my_peer() const;
 
 private:
-	void update_simulation();
+	bool update_simulation();
 	void wait_for_connection();
-	void recalculate_input_delay();
+	bool recalculate_input_delay();
 	void update_checksum_history();
 	void process_checksums();
 	void send_checksums();
@@ -88,8 +88,9 @@ private:
 	void handle_ready(const netplay_ready& ready, netplay_peer& peer);
 	void handle_handshake(const netplay_handshake& handshake, netplay_peer& peer);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
-	void handle_inputs(netplay_input& input_state, netplay_peer& peer);
-	void handle_checksum(const netplay_checksum& checksum, netplay_peer& peer);
+	void handle_inputs_packet(netplay_socket_reader& reader, netplay_peer& peer);
+	netplay_frame handle_inputs(netplay_input& input_state, netplay_peer& peer);
+	bool handle_checksum(const netplay_checksum& checksum, netplay_peer& peer);
 
 	netplay_peer& add_peer(const netplay_addr& address, bool self = false);
 	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
@@ -110,7 +111,7 @@ private:
 	void socket_data(netplay_socket_reader& reader, const netplay_addr& sender);
 
 	// methods called by ioport_manager
-	void send_input_state(netplay_input& input_state);
+	void send_input_state();
 	void next_frame() { m_frame_count++; }
 
 	running_machine& m_machine;
@@ -125,8 +126,8 @@ private:
 	unsigned int m_input_delay_max; // maximum input delay
 	unsigned int m_input_delay;     // how many frames of input delay to use. higher numbers result in less rollbacks
 	unsigned int m_checksum_every;  // how often to send checksum checks
-	unsigned int m_ping_every;      // how often to send pings
 	unsigned int m_max_rollback;    // maximum number of frames we're allowed to rollback
+	unsigned int m_input_redundancy;
 
 	netplay_peerlist m_peers;       // connected peers
 
@@ -144,7 +145,6 @@ private:
 	netplay_stats m_stats;          // various collected stats
 	netplay_checksums m_checksums;  // pending checksums
 	netplay_checksums m_checksum_history;
-	netplay_set_delay m_set_delay;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 };

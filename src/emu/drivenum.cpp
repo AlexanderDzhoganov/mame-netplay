@@ -229,7 +229,7 @@ void driver_enumerator::find_approximate_matches(std::string const &string, std:
 	if (string.empty())
 	{
 		// seed the RNG first
-		srand(osd_ticks());
+		// srand(osd_ticks());
 
 		// allocate a temporary list
 		std::vector<int> templist(m_filtered_count);

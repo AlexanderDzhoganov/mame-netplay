@@ -16,7 +16,7 @@ struct netplay_analog_port
 	bool operator!=(const netplay_analog_port& port) const { return !(port == *this); }
 	
 	template <typename StreamWriter>
-	void serialize(StreamWriter& writer)
+	void serialize(StreamWriter& writer) const
 	{
 		writer.write(m_accum);
 		writer.write(m_previous);
@@ -58,7 +58,7 @@ struct netplay_input_port
 	bool operator!=(const netplay_input_port& port) const { return !(port == *this); };
 
 	template <typename StreamWriter>
-	void serialize(StreamWriter& writer)
+	void serialize(StreamWriter& writer) const
 	{
 		writer.write(m_digital);
 
@@ -108,7 +108,7 @@ struct netplay_input
 	bool operator!=(const netplay_input& port) const { return !(port == *this); };
 
 	template <typename StreamWriter>
-	void serialize(StreamWriter& writer)
+	void serialize(StreamWriter& writer) const
 	{
 		writer.header('I', 'N', 'P', 'T');
 		writer.write(m_frame_index);
