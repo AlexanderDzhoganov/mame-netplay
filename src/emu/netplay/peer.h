@@ -1,8 +1,8 @@
 #ifndef MAME_EMU_NETPLAY_PEER_H
 #define MAME_EMU_NETPLAY_PEER_H
 
-typedef netplay_circular_buffer<netplay_input, 60> netplay_input_buffer;
-typedef netplay_circular_buffer<float, 100> netplay_latency_samples;
+typedef std::unordered_map<netplay_frame, netplay_input> netplay_input_buffer;
+typedef netplay_circular_buffer<float, 600> netplay_latency_samples;
 
 // this is the trivial input predictor
 // it simply repeats the previous frame inputs
@@ -14,9 +14,18 @@ public:
 		if (inputs.empty())
 			return false;
 
-		predicted = inputs.newest();
-		predicted.m_frame_index = frame_index;
-		return true;
+		for (auto i = frame_index; i > 0; i--)
+		{
+			auto it = inputs.find(i);
+			if (it == inputs.end())
+				continue;
+
+			predicted = it->second;
+			predicted.m_frame_index = frame_index;
+			return true;
+		}
+
+		return false;
 	}
 };
 
@@ -50,9 +59,8 @@ class netplay_peer
 	DISABLE_COPYING(netplay_peer);
 
 public:
-	netplay_peer(const netplay_addr& address, attotime join_time, bool self = false);
+	netplay_peer(unsigned char peerid, const netplay_addr& address, attotime join_time, bool self = false);
 	
-	netplay_input& get_next_input_buffer();
 	netplay_input* inputs_for(netplay_frame frame_index);
 	netplay_input* predicted_inputs_for(netplay_frame frame_index);
 
@@ -61,12 +69,9 @@ public:
 	{
 		Predictor predictor;
 
-		m_predicted_inputs.advance(1);
-		auto& predicted = m_predicted_inputs.newest();
+		auto& predicted = m_predicted_inputs[frame_index];
 		if(predictor(m_inputs, predicted, frame_index))
-		{
 			return &predicted;
-		}
 
 		return nullptr;
 	}
@@ -75,15 +80,20 @@ public:
 	void set_state(netplay_peer_state state) { m_state = state; }
 
 	bool self() const { return m_self; }
+	unsigned char peerid() const { return m_peerid; }
 	const std::string& name() const { return m_name; }
 	const attotime& join_time() const { return m_join_time; }
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
+	void gc_buffers(netplay_frame before_frame);
+
+	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer);
 
 	netplay_latency_estimator& latency_estimator() { return m_latency_estimator; }
 
 private:
+	unsigned char m_peerid;
 	netplay_peer_state m_state;
 	bool m_self;                             // whether this is our peer
 	std::string m_name;                      // the peer's self-specified name
@@ -92,6 +102,7 @@ private:
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	attotime m_last_system_time;             // the last system time we've received from this peer
+	netplay_frame m_next_inputs_at;
 	netplay_latency_estimator m_latency_estimator;
 };
 

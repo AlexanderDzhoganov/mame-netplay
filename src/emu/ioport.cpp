@@ -2042,7 +2042,7 @@ g_profiler.start(PROFILER_INPUT);
 	bool netplay_active = machine().netplay_active();
 
 	if (netplay_active)
-		machine().netplay().next_frame();
+		machine().netplay().m_frame_count++;
 
 	playback_frame(curtime);
 	record_frame(curtime);
@@ -2076,9 +2076,8 @@ g_profiler.start(PROFILER_INPUT);
 			// this could happen whenever we switch to a lower input delay
 			if (existing_input == nullptr)
 			{
-				net_input = &(peer->get_next_input_buffer());
+				net_input = &(peer->m_inputs[effective_frame]);
 				net_input->m_frame_index = effective_frame;
-				net_input->m_ports.clear();
 			}
 		}
 	}
@@ -2087,28 +2086,25 @@ g_profiler.start(PROFILER_INPUT);
 	for (auto &port : m_portlist)
 	{
 		port.second->frame_update();
+		// handle playback/record
+		playback_port(*port.second.get());
+		record_port(*port.second.get());
 
-		if (netplay_active)
+		if (!netplay_active)
+			continue;
+
+		auto& live_port = port.second->live();
+
+		if (net_input != nullptr)
 		{
-			auto& live_port = port.second->live();
+			auto& net_port = net_input->add_input_port(live_port.digital);
 
-			if (net_input != nullptr)
-			{
-				auto& net_port = net_input->add_input_port(live_port.digital);
-
-				for (auto& analog : live_port.analoglist)
-					net_port.add_analog_port(analog.m_accum, analog.m_previous);
-			}
-
-			// clear all inputs so we can overwrite them with the synced ones
-			netplay_clear_ports(live_port);
+			for (auto& analog : live_port.analoglist)
+				net_port.add_analog_port(analog.m_accum, analog.m_previous);
 		}
-		else
-		{
-			// handle playback/record
-			playback_port(*port.second.get());
-			record_port(*port.second.get());
-		}
+
+		// clear all inputs so we can overwrite them with the synced ones
+		netplay_clear_ports(live_port);
 	}
 
 	if (netplay_active)
@@ -2119,15 +2115,18 @@ g_profiler.start(PROFILER_INPUT);
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
+			if (peer->m_next_inputs_at >= netplay.m_frame_count)
+				continue;
+
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr)
-			{
-				NETPLAY_LOG("no inputs for %d (peer = %s)", netplay.m_frame_count, peer->name().c_str());
-				/*inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
-				if (inputs == nullptr)
-					continue;*/
-			}
+				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
+
+			if (inputs == nullptr)
+				continue;
+
+			netplay_assert(inputs->m_ports.size() == m_portlist.size());
 
 			// merge the inputs with the emulator ones
 			auto port_index = 0u;
@@ -2140,7 +2139,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// finally submit my input state for sending
 		if (net_input != nullptr)
-			netplay.send_input_state();
+			netplay.send_input_state(net_input->m_frame_index);
 	}
 
 	// loop over all input ports

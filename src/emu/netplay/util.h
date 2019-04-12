@@ -9,7 +9,6 @@
 #define netplay_assert(COND) do { \
 	if (!(COND)) { \
 		printf("\n\nassertion failed: " #COND " (%s:%d)\n\n", __FILE__, __LINE__); \
-		exit(1); \
 	} \
 } while(0);
 #endif
@@ -33,14 +32,6 @@ public:
 	}
 
 	void advance(unsigned int offset) { m_cursor = (m_cursor + offset) % N; }
-	void rewind(unsigned int offset)
-	{
-		while (offset > m_cursor)
-			m_cursor += m_size;
-
-		m_cursor -= offset;
-	}
-
 	bool empty() const { return m_size == 0; }
 	size_t size() const { return m_size; }
 	size_t capacity() const { return N; }
