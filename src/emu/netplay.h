@@ -34,7 +34,7 @@ struct netplay_state
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
-typedef netplay_circular_buffer<netplay_state, 10> netplay_statelist;
+typedef netplay_circular_buffer<netplay_state, 6> netplay_statelist;
 
 struct netplay_stats
 {
@@ -90,9 +90,12 @@ private:
 	bool peer_inputs_available() const;
 	bool wait_for_peer_inputs();
 	bool wait_for_connection();
+	void set_input_delay(unsigned int input_delay);
+	void send_checksums();
+	bool verify_checksums();
 
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
-	void write_packet_header(netplay_socket_writer& writer, unsigned char flags);
+	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
 	bool read_packet_header(netplay_socket_reader& reader, unsigned char& flags, netplay_peer& sender);
 
 	void print_stats() const;
@@ -138,6 +141,7 @@ private:
 	unsigned char m_next_peerid;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
+	std::unordered_map<netplay_frame, unsigned int> m_pending_checksums;
 };
 
 #endif

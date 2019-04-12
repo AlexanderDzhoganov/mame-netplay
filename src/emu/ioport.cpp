@@ -2115,15 +2115,12 @@ g_profiler.start(PROFILER_INPUT);
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
-			if (peer->m_next_inputs_at >= netplay.m_frame_count)
-				continue;
-
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr)
 				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 
-			if (inputs == nullptr)
+			if (inputs == nullptr || inputs->m_ports.empty())
 				continue;
 
 			netplay_assert(inputs->m_ports.size() == m_portlist.size());

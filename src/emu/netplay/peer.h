@@ -102,8 +102,9 @@ private:
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	attotime m_last_system_time;             // the last system time we've received from this peer
-	netplay_frame m_next_inputs_at;
 	netplay_latency_estimator m_latency_estimator;
+	std::unordered_map<netplay_frame, unsigned int> m_checksums;
+	netplay_frame m_next_inputs_at;
 };
 
 #endif

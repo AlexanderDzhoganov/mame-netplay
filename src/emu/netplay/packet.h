@@ -8,8 +8,9 @@ enum netplay_packet_flags
 	NETPLAY_READY      = 1 << 1, // client ready
 	NETPLAY_SYNC       = 1 << 2, // sync data
 	NETPLAY_DELAY      = 1 << 3, // new input delay
+	NETPLAY_CHECKSUM   = 1 << 4, // client memory checksum
 	// unreliable
-	NETPLAY_INPUTS     = 1 << 4  // player inputs
+	NETPLAY_INPUTS     = 1 << 5 // player inputs
 };
 
 struct netplay_handshake
@@ -156,6 +157,30 @@ struct netplay_delay
 		reader.header('D', 'L', 'A', 'Y');
 		reader.read(m_effective_frame);
 		reader.read(m_input_delay);
+	}
+};
+
+struct netplay_checksum
+{
+	netplay_frame m_frame_count;
+	unsigned int m_checksum;
+
+	netplay_checksum() : m_frame_count(0), m_checksum(0) {}
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.header('C', 'H', 'E', 'K');
+		writer.write(m_frame_count);
+		writer.write(m_checksum);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.header('C', 'H', 'E', 'K');
+		reader.read(m_frame_count);
+		reader.read(m_checksum);
 	}
 };
 
