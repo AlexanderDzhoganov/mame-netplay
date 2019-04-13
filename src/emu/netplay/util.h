@@ -13,7 +13,7 @@
 } while(0);
 #endif
 
-typedef unsigned int netplay_frame;
+typedef unsigned int netplay_frame; 
 
 template <typename T, size_t N>
 class netplay_circular_buffer
@@ -40,32 +40,6 @@ public:
 	{
 		m_cursor = 0;
 		m_size = 0;
-	}
-
-	T& newest()
-	{
-		netplay_assert(m_cursor < m_size);
-		return m_buffer[m_cursor];
-	}
-
-	const T& peek(int offset) const {
-		int cursor = (int)m_cursor + offset;
-		if (cursor < 0)
-		{
-			cursor = m_size + cursor;
-		}
-
-		cursor %= m_size;
-		netplay_assert(cursor >= 0);
-		netplay_assert(cursor < m_size);
-
-		return m_buffer[cursor];
-	}
-
-	const T& newest() const
-	{
-		netplay_assert(m_cursor < m_size);
-		return m_buffer[m_cursor];
 	}
 
 	T& operator[] (size_t index)

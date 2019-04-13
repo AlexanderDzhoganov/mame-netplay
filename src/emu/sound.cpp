@@ -1093,7 +1093,12 @@ void sound_manager::update(void *ptr, int param)
 		speaker.mix(&m_leftmix[0], &m_rightmix[0], samples_this_update, (m_muted & MUTE_REASON_SYSTEM));
 
 	// now downmix the final result
-	u32 finalmix_step = machine().video().speed_factor();
+
+	int speed_factor = machine().video().speed_factor();
+	if (machine().netplay_active())
+		speed_factor = 1000;
+
+	u32 finalmix_step = speed_factor;
 	u32 finalmix_offset = 0;
 	s16 *finalmix = &m_finalmix[0];
 	int sample;
@@ -1122,23 +1127,14 @@ void sound_manager::update(void *ptr, int param)
 	// play the result
 	if (finalmix_offset > 0)
 	{
-		bool netplay_catching_up = false;
-		if (machine().netplay_active() && machine().netplay().waiting())
-			netplay_catching_up = true;
-
-		// if nosound mode is off and either netplay is not active
-		// or it's not catching up then update the audio stream
-		if (!m_nosound_mode && !netplay_catching_up)
+		if (!m_nosound_mode)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
-		
-		if (!netplay_catching_up)
-		{
-			machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
-			machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
+	
+		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
+		machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
 
-			if (m_wavfile != nullptr)
-				wav_add_data_16(m_wavfile, finalmix, finalmix_offset);
-		}
+		if (m_wavfile != nullptr)
+			wav_add_data_16(m_wavfile, finalmix, finalmix_offset);
 	}
 
 	// see if we ticked over to the next second

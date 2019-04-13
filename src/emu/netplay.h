@@ -34,7 +34,7 @@ struct netplay_state
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
-typedef netplay_circular_buffer<netplay_state, 5> netplay_statelist;
+typedef std::vector<netplay_state> netplay_statelist;
 
 struct netplay_stats
 {
@@ -75,7 +75,7 @@ private:
 	void recalculate_input_delay();
 	void send_sync(bool full_sync);
 
-	bool store_state();
+	netplay_state* store_state();
 	void load_state(const netplay_state& state);
 	bool rollback(netplay_frame before_frame);
 
@@ -94,6 +94,8 @@ private:
 	void set_input_delay(unsigned int input_delay);
 	void send_checksums();
 	bool verify_checksums();
+	netplay_state* get_state_for(netplay_frame frame);
+	netplay_state* get_oldest_state();
 
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
 	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
@@ -130,7 +132,7 @@ private:
 	netplay_state m_good_state;     // last known good state acknowledged between all peers
 
 	unsigned int m_sync_generation; // we increment this every time we do a sync
-	netplay_frame m_frame_count;    // current frame (update) count
+	netplay_frame m_frame_count;     // current frame (update) count
 
 	bool m_catching_up;             // are we catching up?
 	bool m_waiting_for_inputs;      // are we waiting for inputs?
@@ -140,6 +142,8 @@ private:
 	netplay_delay m_next_input_delay;
 	unsigned int m_input_delay_backoff;
 	unsigned char m_next_peerid;
+	bool m_state_valid;
+	netplay_frame m_state_valid_before;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 	std::unordered_map<netplay_frame, unsigned int> m_pending_checksums;

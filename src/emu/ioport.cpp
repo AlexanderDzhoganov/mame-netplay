@@ -2042,7 +2042,10 @@ g_profiler.start(PROFILER_INPUT);
 	bool netplay_active = machine().netplay_active();
 
 	if (netplay_active)
-		machine().netplay().m_frame_count++;
+	{
+		auto& frame_count = machine().netplay().m_frame_count;
+		frame_count++;
+	}
 
 	playback_frame(curtime);
 	record_frame(curtime);
@@ -2115,9 +2118,12 @@ g_profiler.start(PROFILER_INPUT);
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
+			if (peer->m_next_inputs_at > netplay.m_frame_count)
+				continue;
+
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
-			if (inputs == nullptr)
+			if (inputs == nullptr && !netplay.m_catching_up)
 				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 
 			if (inputs == nullptr || inputs->m_ports.empty())
