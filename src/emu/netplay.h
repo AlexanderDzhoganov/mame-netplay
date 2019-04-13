@@ -96,6 +96,8 @@ private:
 	bool verify_checksums();
 	netplay_state* get_state_for(netplay_frame frame);
 	netplay_state* get_oldest_state();
+	netplay_state* get_newest_state();
+	bool can_save();
 
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
 	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
@@ -142,8 +144,6 @@ private:
 	netplay_delay m_next_input_delay;
 	unsigned int m_input_delay_backoff;
 	unsigned char m_next_peerid;
-	bool m_state_valid;
-	netplay_frame m_state_valid_before;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 	std::unordered_map<netplay_frame, unsigned int> m_pending_checksums;

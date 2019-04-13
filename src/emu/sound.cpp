@@ -1127,7 +1127,8 @@ void sound_manager::update(void *ptr, int param)
 	// play the result
 	if (finalmix_offset > 0)
 	{
-		if (!m_nosound_mode)
+		auto waiting = machine().netplay_active() && machine().netplay().waiting();
+		if (!m_nosound_mode && !waiting)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
 	
 		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);

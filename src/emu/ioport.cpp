@@ -2070,18 +2070,21 @@ g_profiler.start(PROFILER_INPUT);
 	{
 		auto& netplay = machine().netplay();
 		auto peer = netplay.my_peer();
-		if (peer != nullptr)
-		{
-			auto effective_frame = netplay.m_frame_count + netplay.m_input_delay;
-			auto existing_input = peer->inputs_for(effective_frame);
+		netplay_assert(peer != nullptr);
 
-			// we only record new inputs if there aren't any existing ones for the target frame
-			// this could happen whenever we switch to a lower input delay
-			if (existing_input == nullptr)
-			{
-				net_input = &(peer->m_inputs[effective_frame]);
-				net_input->m_frame_index = effective_frame;
-			}
+		auto effective_frame = netplay.m_frame_count + netplay.m_input_delay;
+		auto existing_input = peer->inputs_for(effective_frame);
+
+		// we only record new inputs if there aren't any existing ones for the target frame
+		// this could happen whenever we switch to a lower input delay
+		if (existing_input == nullptr)
+		{
+			net_input = &(peer->m_inputs[effective_frame]);
+			net_input->m_frame_index = effective_frame;
+		}
+		else
+		{
+			NETPLAY_LOG("have existing inputs for %d", effective_frame);
 		}
 	}
 
@@ -2126,9 +2129,21 @@ g_profiler.start(PROFILER_INPUT);
 			if (inputs == nullptr)
 			{
 				if (netplay.m_catching_up)
+				{
 					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
+					if (!peer->self())
+						NETPLAY_LOG("applying previously predicted inputs on %d", netplay.m_frame_count);
+				}
 				else
+				{
 					inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
+					if (!peer->self())
+						NETPLAY_LOG("predicting inputs for %d", netplay.m_frame_count);
+				}
+			}
+			else if (!peer->self())
+			{
+				NETPLAY_LOG("applying known inputs for %d", netplay.m_frame_count);
 			}
 
 			if (inputs == nullptr || inputs->m_ports.empty())

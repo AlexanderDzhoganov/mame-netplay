@@ -69,11 +69,11 @@ public:
 	{
 		Predictor predictor;
 
-		auto& predicted = m_predicted_inputs[frame_index];
-		if(predictor(m_inputs, predicted, frame_index))
-			return &predicted;
+		netplay_input predicted;
+		if(!predictor(m_inputs, predicted, frame_index))
+			return nullptr;
 
-		return nullptr;
+		return &m_predicted_inputs[frame_index];
 	}
 
 	netplay_peer_state state() const { return m_state; }
@@ -86,6 +86,7 @@ public:
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
+	bool dirty() const { return !m_predicted_inputs.empty(); }
 	void gc_buffers(netplay_frame before_frame);
 
 	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer);
