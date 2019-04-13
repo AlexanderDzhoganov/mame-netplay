@@ -2123,11 +2123,19 @@ g_profiler.start(PROFILER_INPUT);
 
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
-			if (inputs == nullptr && !netplay.m_catching_up)
-				inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
+			if (inputs == nullptr)
+			{
+				if (netplay.m_catching_up)
+					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
+				else
+					inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
+			}
 
 			if (inputs == nullptr || inputs->m_ports.empty())
+			{
+				NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
 				continue;
+			}
 
 			netplay_assert(inputs->m_ports.size() == m_portlist.size());
 

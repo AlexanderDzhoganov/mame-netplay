@@ -61,7 +61,7 @@ netplay_manager::netplay_manager(running_machine& machine) :
 
 	m_max_block_size = opts.netplay_block_size(); // 1kb max block size
 	m_input_delay = 5;                            // use N frames of input delay
-	m_max_rollback = 10;                          // max rollback of N frames
+	m_max_rollback = 8;                           // max rollback of N frames
 	m_input_redundancy = 10;                      // how many frames of inputs to send per packet
 
 	for (auto i = 0; i < 5; i++)
@@ -118,15 +118,24 @@ void netplay_manager::update()
 
 	if (!m_state_valid && m_state_valid_before + m_max_rollback <= m_frame_count)
 	{
-		send_sync(false);
-		return;
+		static int frames = 0;
+		if (frames++ >= m_frame_count + 240)
+		{
+			NETPLAY_LOG("timed out while waiting for inputs");
+			if (m_host)
+				send_sync(false);
+		}
+
+		rollback(m_state_valid_before);
+		if (!m_state_valid)
+			return;
 	}
 
 	auto current_frame = m_frame_count;
 	while (m_frame_count == current_frame)
 		machine().scheduler().timeslice();
 
-	if (m_state_valid && m_frame_count % 3 == 0)
+	if (m_state_valid && (m_frame_count % 3 == 0))
 		store_state();
 
 	if (m_host)
@@ -176,7 +185,7 @@ unsigned int netplay_manager::calculate_input_delay()
 		target_latency = std::max(target_latency, avg_latency);
 	}
 
-	auto input_delay = (int)(target_latency / (1000.0f / 60.0f)) - 1;
+	auto input_delay = (int)(target_latency / (1000.0f / 60.0f));
 	return std::min(std::max(input_delay, 0), NETPLAY_INPUT_DELAY_MAX);
 }
 
@@ -278,7 +287,10 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 	netplay_assert(before_frame <= m_frame_count); // impossible to go to the future
 
 	if (!m_state_valid && m_state_valid_before < before_frame)
+	{
+		NETPLAY_LOG("state is invalid, forcing rollback to %d instead of %d", m_state_valid_before, before_frame);
 		before_frame = m_state_valid_before;
+	}
 
 	// store the current time, we'll advance the simulation to it later
 	auto start_frame = m_frame_count;
@@ -295,12 +307,11 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 			rollback_state = &state;
 	}
 
-	// NETPLAY_LOG("rollback from %d to %d (before = %d)", start_frame, state_frame, before_frame)
-
 	if (rollback_state == nullptr)
 	{
 		// the given time is too far in the past and there is no state to rollback to
 		// bail out and let the caller figure it out
+		NETPLAY_LOG("rollback from %d to %d failed", m_frame_count, before_frame);
 		m_stats.m_rollback_fail++;
 		return false;
 	}
@@ -312,15 +323,18 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 	{
 		auto& peer_inputs = peer->m_inputs;
 
-		for (auto i = rollback_frame; i <= m_frame_count; i++)
+		for (auto i = rollback_frame + 1; i <= m_frame_count; i++)
 		{
-			if (peer_inputs.find(i) != peer_inputs.end())
+			if (peer->m_next_inputs_at > i || peer_inputs.find(i) != peer_inputs.end())
 				continue;
 			
 			safe = false;
 			break;
 		}
 	}
+
+	NETPLAY_LOG("rollback from %d to %d (before = %d, safe = %d)",
+		start_frame, rollback_state->m_frame_count, before_frame, safe)
 
 	m_state_valid = safe;
 	m_state_valid_before = safe ? 0 : before_frame;
@@ -341,12 +355,12 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 
 		// we can store the state only if we have determined this rollback is safe
 		// meaning that all inputs between the rollback frame and the current frame have been received
-		if (m_state_valid && m_frame_count % 3 == 0)
+		if (m_state_valid && (m_frame_count % 3 == 0))
 			store_state();
 	}
 
-	// for (auto& peer : m_peers)
-	//	peer->m_checksums.clear();
+	for (auto& peer : m_peers)
+		peer->m_checksums.clear();
 
 	m_catching_up = false;
 	m_stats.m_rollback_success++;
@@ -362,6 +376,7 @@ void netplay_manager::send_sync(bool full_sync)
 
 	// increment the sync generation and record stats
 	m_state_valid = true;
+	m_state_valid_before = 0;
 	m_sync_generation++;
 	m_stats.m_syncs++;
 	m_next_input_delay.m_processed = true;
@@ -501,6 +516,7 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 	netplay_assert(!m_host);
 
 	m_state_valid = true;
+	m_state_valid_before = 0;
 	m_sync_generation++;
 	m_good_state.m_frame_count = sync.m_frame_count;
 
