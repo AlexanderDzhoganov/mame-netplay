@@ -34,14 +34,12 @@ struct netplay_state
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
-typedef std::vector<netplay_state> netplay_statelist;
 
 struct netplay_stats
 {
 	unsigned int m_syncs;
 	unsigned int m_sync_total_bytes;
-	unsigned int m_rollback_success;
-	unsigned int m_rollback_fail;
+	unsigned int m_rollbacks;
 	unsigned int m_max_latency;
 	unsigned int m_avg_latency_sum;
 	unsigned int m_avg_latency_n;
@@ -75,9 +73,9 @@ private:
 	void recalculate_input_delay();
 	void send_sync(bool full_sync);
 
-	netplay_state* store_state();
+	void store_state();
 	void load_state(const netplay_state& state);
-	bool rollback(netplay_frame before_frame);
+	void rollback();
 
 	void handle_host_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
 	void handle_client_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
@@ -90,11 +88,7 @@ private:
 	netplay_peer* get_peer_by_peerid(unsigned char peerid) const;
 	bool wait_for_connection();
 	void set_input_delay(unsigned int input_delay);
-	void send_checksums();
-	bool verify_checksums();
-	netplay_state* get_state_for(netplay_frame frame);
-	netplay_state* get_oldest_state();
-	netplay_state* get_newest_state();
+	void verify_checksums();
 	bool can_save();
 
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
@@ -128,7 +122,7 @@ private:
 	netplay_peerlist m_peers;       // connected peers
 
 	netplay_blocklist m_memory;     // memory blocks in-use by the emulator
-	netplay_statelist m_states;     // saved emulator states
+	netplay_state m_last_state;     // last stored state
 	netplay_state m_good_state;     // last known good state acknowledged between all peers
 
 	unsigned int m_sync_generation; // we increment this every time we do a sync
@@ -144,7 +138,6 @@ private:
 	unsigned char m_next_peerid;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
-	std::unordered_map<netplay_frame, unsigned int> m_pending_checksums;
 };
 
 #endif

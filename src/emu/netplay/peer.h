@@ -54,7 +54,7 @@ class netplay_peer
 	DISABLE_COPYING(netplay_peer);
 
 public:
-	netplay_peer(unsigned char peerid, const netplay_addr& address, attotime join_time, bool self = false);
+	netplay_peer(unsigned char peerid, const netplay_addr& address, bool self = false);
 	
 	netplay_input* inputs_for(netplay_frame frame_index);
 	netplay_input* predicted_inputs_for(netplay_frame frame_index);
@@ -63,27 +63,24 @@ public:
 	netplay_input* predict_input_state(netplay_frame frame_index)
 	{
 		Predictor predictor;
+		netplay_assert(m_predicted_inputs.find(frame_index) == m_predicted_inputs.end());
 		auto& predicted = m_predicted_inputs[frame_index];
 		predicted.m_frame_index = frame_index;
 		predictor(m_inputs, predicted, frame_index);
 		return &predicted;
 	}
 
-	netplay_peer_state state() const { return m_state; }
-	void set_state(netplay_peer_state state) { m_state = state; }
-
 	bool self() const { return m_self; }
 	unsigned char peerid() const { return m_peerid; }
 	const std::string& name() const { return m_name; }
-	const attotime& join_time() const { return m_join_time; }
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
 	bool dirty() const { return !m_predicted_inputs.empty(); }
 	void gc_buffers(netplay_frame before_frame);
 
-	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer);
-
+	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer, bool warn);
+ 
 	netplay_latency_estimator& latency_estimator() { return m_latency_estimator; }
 
 private:
@@ -92,7 +89,6 @@ private:
 	bool m_self;                             // whether this is our peer
 	std::string m_name;                      // the peer's self-specified name
 	netplay_addr m_address;                  // the peer's network address
-	attotime m_join_time;                    // when the peer joined
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	attotime m_last_system_time;             // the last system time we've received from this peer

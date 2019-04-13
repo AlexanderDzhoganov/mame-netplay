@@ -2042,10 +2042,7 @@ g_profiler.start(PROFILER_INPUT);
 	bool netplay_active = machine().netplay_active();
 
 	if (netplay_active)
-	{
-		auto& frame_count = machine().netplay().m_frame_count;
-		frame_count++;
-	}
+		machine().netplay().m_frame_count++;
 
 	playback_frame(curtime);
 	record_frame(curtime);
@@ -2077,7 +2074,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// we only record new inputs if there aren't any existing ones for the target frame
 		// this could happen whenever we switch to a lower input delay
-		if (existing_input == nullptr)
+		if (existing_input == nullptr && peer->m_next_inputs_at <= effective_frame)
 		{
 			net_input = &(peer->m_inputs[effective_frame]);
 			net_input->m_frame_index = effective_frame;
@@ -2130,12 +2127,14 @@ g_profiler.start(PROFILER_INPUT);
 				}
 				else if (netplay.m_catching_up)
 				{
+					netplay_assert(!peer->self());
 					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
 					if (!peer->self())
 						NETPLAY_LOG("applying previously predicted inputs on %d", netplay.m_frame_count);
 				}
 				else
 				{
+					netplay_assert(!peer->self());
 					inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 					if (!peer->self())
 						NETPLAY_LOG("predicting inputs for %d", netplay.m_frame_count);
@@ -2146,11 +2145,14 @@ g_profiler.start(PROFILER_INPUT);
 				NETPLAY_LOG("applying known inputs for %d", netplay.m_frame_count);
 			}
 
-			if (inputs == nullptr || inputs->m_ports.empty())
+			if (inputs == nullptr)
 			{
-				// NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
+				NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
 				continue;
 			}
+
+			if (inputs->m_ports.empty())
+				continue;
 
 			netplay_assert(inputs->m_ports.size() == m_portlist.size());
 

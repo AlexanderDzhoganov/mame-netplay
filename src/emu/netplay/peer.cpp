@@ -51,13 +51,12 @@ float netplay_latency_estimator::predicted_latency()
 	return predicted;
 }
 
-netplay_peer::netplay_peer(unsigned char peerid, const netplay_addr& address, attotime join_time, bool self) :
+netplay_peer::netplay_peer(unsigned char peerid, const netplay_addr& address, bool self) :
 	m_peerid(peerid),
 	m_state(NETPLAY_PEER_DISCONNECTED),
 	m_self(self),
 	m_name("peer"),
 	m_address(address),
-	m_join_time(join_time),
 	m_last_system_time(0, 0),
 	m_next_inputs_at(0) {}
 
@@ -81,16 +80,19 @@ netplay_input* netplay_peer::predicted_inputs_for(netplay_frame frame_index)
 
 void netplay_peer::gc_buffers(netplay_frame before_frame)
 {
-	gc_buffer(before_frame, m_inputs);
-	gc_buffer(before_frame, m_predicted_inputs);
+	gc_buffer(before_frame, m_inputs, false);
+	gc_buffer(before_frame, m_predicted_inputs, true);
 }
 
-void netplay_peer::gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer)
+void netplay_peer::gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer, bool warn)
 {
 	for (auto it = buffer.begin(); it != buffer.end(); ++it)
 	{
 		if (it->first >= before_frame)
 			continue;
+
+		if (warn)
+			NETPLAY_LOG("dangling predicted inputs for frame %d", it->first);
 
 		it = buffer.erase(it);
 		if (it == buffer.end())
