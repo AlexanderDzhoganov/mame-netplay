@@ -17,8 +17,7 @@
 #include "netplay/peer.h"
 
 #define NETPLAY_MAX_PLAYERS 4
-#define NETPLAY_INPUT_DELAY_MIN 1u
-#define NETPLAY_INPUT_DELAY_MAX 20u
+#define NETPLAY_INPUT_DELAY_MAX 12
 
 #define PACKET(FLAGS, CODE) do {      \
 	netplay_socket_writer packet;       \
@@ -60,7 +59,7 @@ netplay_manager::netplay_manager(running_machine& machine) :
 
 	m_max_block_size = opts.netplay_block_size(); // 1kb max block size
 	m_input_delay = 5;                            // use N frames of input delay
-	m_max_rollback = 3;                           // max rollback of N frames
+	m_max_rollback = 10;                          // max rollback of N frames
 	m_input_redundancy = 10;                      // how many frames of inputs to send per packet
 
 	for (auto i = 0; i < m_states.capacity(); i++)
@@ -119,13 +118,13 @@ void netplay_manager::update()
 	while (m_frame_count == current_frame)
 		machine().scheduler().timeslice();
 
-	store_state();
+	if (m_frame_count % 3 == 0)
+		store_state();
 
 	if (m_host)
 	{
 		recalculate_input_delay();
-		if(verify_checksums())
-			return;
+		verify_checksums();
 	}
 	else
 	{
@@ -133,7 +132,7 @@ void netplay_manager::update()
 	}
 
 	// every N frames garbage collect the input buffers
-	auto gc_every = 21;
+	auto gc_every = 30;
 	if (m_frame_count % gc_every && m_frame_count > gc_every)
 		for (auto& peer : m_peers)
 			peer->gc_buffers(m_frame_count - gc_every);
@@ -150,22 +149,10 @@ void netplay_manager::update()
 	}
 }
 
-void netplay_manager::recalculate_input_delay()
+unsigned int netplay_manager::calculate_input_delay()
 {
-	netplay_assert(m_host);
-
-	if (!m_next_input_delay.m_processed)
-		return;
-
-	if (m_input_delay_backoff > 0)
-		m_input_delay_backoff--;
-
-	if (m_input_delay_backoff != 0 || m_peers.size() <= 1)
-		return;
-
 	float target_latency = 0.0f;
 
-	// find the peer with the highest latency
 	for (auto& peer : m_peers)
 	{
 		if (peer->self())
@@ -181,20 +168,34 @@ void netplay_manager::recalculate_input_delay()
 		target_latency = std::max(target_latency, avg_latency);
 	}
 
-	// adjust the input delay
-	auto input_delay = (unsigned int)(target_latency / (1000.0f / 60.0f));
-	input_delay = std::max(NETPLAY_INPUT_DELAY_MIN, std::min(input_delay, NETPLAY_INPUT_DELAY_MAX));
+	auto input_delay = (int)(target_latency / (1000.0f / 60.0f)) - 1;
+	return std::min(std::max(input_delay, 0), NETPLAY_INPUT_DELAY_MAX);
+}
 
+void netplay_manager::recalculate_input_delay()
+{
+	netplay_assert(m_host);
+
+	if (!m_next_input_delay.m_processed)
+		return;
+
+	if (m_input_delay_backoff > 0)
+		m_input_delay_backoff--;
+
+	if (m_input_delay_backoff != 0 || m_peers.size() <= 1)
+		return;
+
+	auto input_delay = calculate_input_delay();
 	if (m_input_delay == input_delay)
 		return;
 
 	NETPLAY_LOG("setting next input delay to '%d'", input_delay);
 
-	m_input_delay_backoff = 31;
+	m_input_delay_backoff = 90;
 
 	m_next_input_delay.m_processed = false;
 	m_next_input_delay.m_input_delay = input_delay;
-	m_next_input_delay.m_effective_frame = m_frame_count + input_delay * 2;
+	m_next_input_delay.m_effective_frame = m_frame_count + 60;
 
 	PACKET(NETPLAY_DELAY, {
 		DATA(m_next_input_delay);
@@ -243,6 +244,7 @@ bool netplay_manager::store_state()
 	// record metadata
 	state->m_frame_count = m_frame_count;
 
+	// this is necessary or we get desyncs
 	machine().save().dispatch_postload();
 
 	if (!m_host)
@@ -302,10 +304,6 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 	{
 		// the given time is too far in the past and there is no state to rollback to
 		// bail out and let the caller figure it out
-		NETPLAY_LOG("rollback failed");
-		for (auto& state : m_states)
-			NETPLAY_LOG("have state for %d", state.m_frame_count);
-
 		m_stats.m_rollback_fail++;
 		return false;
 	}
@@ -324,8 +322,12 @@ bool netplay_manager::rollback(netplay_frame before_frame)
 		while (m_frame_count == prev_frame)
 			machine().scheduler().timeslice();
 
-		store_state();
+		if (m_frame_count % 3 == 0)
+			store_state();
 	}
+
+	for (auto& peer : m_peers)
+		peer->m_checksums.clear();
 
 	m_catching_up = false;
 	m_stats.m_rollback_success++;
@@ -342,11 +344,18 @@ void netplay_manager::send_sync(bool full_sync)
 	// increment the sync generation and record stats
 	m_sync_generation++;
 	m_stats.m_syncs++;
-	m_input_delay_backoff = 31;
 	m_next_input_delay.m_processed = true;
+	m_input_delay_backoff = 31;
+	m_input_delay = calculate_input_delay();
 
 	store_state();
 	auto& state = m_states.newest();
+
+	for (auto& peer : m_peers)
+	{
+		peer->m_next_inputs_at = state.m_frame_count + m_input_delay + 1;
+		peer->m_checksums.clear();
+	}
 
 	netplay_socket_writer packet;
 	write_packet_header(packet, NETPLAY_SYNC); 
@@ -354,29 +363,6 @@ void netplay_manager::send_sync(bool full_sync)
 	netplay_sync sync;
 	sync.m_frame_count = state.m_frame_count;
 	sync.m_input_delay = m_input_delay;
-
-	for (auto& peer : m_peers)
-	{
-		peer->m_next_inputs_at = state.m_frame_count + m_input_delay + 1;
-			
-		for (auto& pair : peer->m_predicted_inputs)
-		{
-			auto& input = pair.second;
-			if (peer->m_inputs.find(input.m_frame_index) != peer->m_inputs.end())
-				continue;
-
-			peer->m_inputs[input.m_frame_index] = input;
-		}
-
-		peer->m_predicted_inputs.clear();
-
-		std::vector<netplay_input> inputs;
-		for (auto& pair : peer->m_inputs)
-			inputs.push_back(pair.second);
-
-		sync.m_inputs.push_back(std::make_pair(peer->m_peerid, std::move(inputs)));
-	}
-
 	sync.serialize(packet);
 
 	m_good_state.m_frame_count = state.m_frame_count;
@@ -405,8 +391,8 @@ void netplay_manager::send_sync(bool full_sync)
 	{
 		auto checksum = m_good_state.checksum();
 		auto size = packet.stream().cursor();
-		NETPLAY_LOG("sending %ssync: frame = %d, checksum = %#08x, size = %lu",
-			full_sync ? "full " : "", state.m_frame_count, checksum, size);
+		NETPLAY_LOG("sending %ssync: frame = %d, checksum = %#08x, size = %lu, next_inputs = %d",
+			full_sync ? "full " : "", state.m_frame_count, checksum, size, state.m_frame_count + m_input_delay);
 	}
 }
 
@@ -418,16 +404,7 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, unsigned
 	{
 		netplay_ready ready;
 		ready.deserialize(reader);
-
 		peer.m_name = ready.m_name;
-
-		netplay_input empty;
-		for (auto i = 0; i < m_max_rollback + m_input_delay; i++)
-		{
-			empty.m_frame_index = m_frame_count + m_input_delay - i;
-			peer.m_inputs[empty.m_frame_index] = empty;
-		}
-
 		send_sync(true);
 	}
 	else if (flags & NETPLAY_INPUTS)
@@ -511,17 +488,6 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 
 	for (auto& peer : m_peers)
 		peer->m_next_inputs_at = sync.m_frame_count + m_input_delay + 1;
-
-	// load all the input buffers from the sync
-	for (auto& pair : sync.m_inputs)
-	{
-		auto peer = get_peer_by_peerid(pair.first);
-		if (peer == nullptr)
-			continue;
-
-		for (auto& inputs : pair.second)
-			peer->m_inputs[inputs.m_frame_index] = std::move(inputs);
-	}
 
 	// copy the memory blocks over
 	netplay_packet_read_blocks(reader, m_good_state.m_blocks);
@@ -822,10 +788,13 @@ bool netplay_manager::peer_inputs_available() const
 
 	for(auto& peer : m_peers)
 	{
-		if (peer->self() || peer->m_next_inputs_at + 1 >= m_frame_count)
+		if (peer->self())
 			continue;
 
-		auto target_frame = m_frame_count + 1 - m_max_rollback;
+		auto target_frame = m_frame_count - m_max_rollback;
+		if (peer->m_next_inputs_at > target_frame)
+			continue;
+
 		auto inputs = peer->inputs_for(target_frame);
 		if (inputs == nullptr)
 		{
@@ -841,7 +810,7 @@ bool netplay_manager::peer_inputs_available() const
 					target_frame, m_frame_count, s.c_str());
 			}
 
-			last_frame = m_frame_count; */
+			last_frame = m_frame_count;*/
 			return false;
 		}
 	}
@@ -907,16 +876,9 @@ bool netplay_manager::wait_for_connection()
 
 void netplay_manager::set_input_delay(unsigned int input_delay)
 {
-	auto diff = (int)input_delay - (int)m_input_delay;
-	netplay_input empty;
-
-	auto start_frame = m_frame_count + m_input_delay + 1;
-	for (auto i = 0; i < diff; i++)
-	{
-		empty.m_frame_index = start_frame + i;
+	if (input_delay > m_input_delay)
 		for (auto& peer : m_peers)
-			peer->m_inputs[empty.m_frame_index] = empty;
-	}
+			peer->m_next_inputs_at = m_frame_count + input_delay + 1;
 
 	m_input_delay = input_delay;
 	NETPLAY_LOG("setting input delay to %d at %d", m_input_delay, m_frame_count);
@@ -928,7 +890,7 @@ void netplay_manager::send_checksums()
 
 	for (auto it = checksums.begin(); it != checksums.end(); ++it)
 	{
-		if (it->first >= m_frame_count - m_max_rollback * 3)
+		if (it->first >= m_frame_count - 21)
 			continue;
 
 		netplay_checksum checksum;
@@ -937,7 +899,7 @@ void netplay_manager::send_checksums()
 
 		PACKET(NETPLAY_CHECKSUM, {
 			DATA(checksum);
-			SEND_TO(m_peers[0]->address(), true);
+			SEND_TO(m_peers[0]->address(), false);
 		});
 
 		it = checksums.erase(it);
@@ -1097,8 +1059,18 @@ bool netplay_manager::read_packet_header(netplay_socket_reader& reader, unsigned
 		// this is my timestamp, calculate the latency to the sender
 		auto latency_ms = (system_time() - last_system_time).as_double() * 1000.0;
 
-		// add the round-trip latency to this peer's stats
-		sender.latency_estimator().add_sample(latency_ms * 0.5f);
+		static float sum = 0.0f;
+
+		if (m_frame_count % 5 == 0)
+		{
+			// add half the round-trip latency to this peer's stats
+			sender.latency_estimator().add_sample((sum / 5.0f) * 0.5f);
+			sum = 0.0f;
+		}
+		else
+		{
+			sum += latency_ms;
+		}
 	}
 
 	return true;

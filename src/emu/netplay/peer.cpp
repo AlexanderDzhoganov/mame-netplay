@@ -7,7 +7,7 @@
 #include "netplay/peer.h"
 
 netplay_latency_estimator::netplay_latency_estimator() :
-	m_exp_alpha(0.05f),
+	m_exp_alpha(0.085f),
 	m_last_avg_value(50.0f)
 {
 	// add an initial sample of 50ms
@@ -16,7 +16,7 @@ netplay_latency_estimator::netplay_latency_estimator() :
 
 void netplay_latency_estimator::add_sample(float latency_ms)
 {
-	latency_ms = std::max(1.0f, std::min(250.0f, latency_ms));
+	latency_ms = std::max(1.0f, std::min(1000.0f, latency_ms));
 	m_history.push_back(latency_ms);
 }
 
@@ -42,7 +42,7 @@ float netplay_latency_estimator::predicted_latency()
 
 	m_last_avg_value = avg;
 
-	float confidence = 1.0f - std::min(1.0f, (high - low) / 250.0f);
+	float confidence = 1.0f - std::min(1.0f, (high - low) / 1000.0f);
 	float predicted = avg * confidence + high * (1.0f - confidence);
 
 	// static int every = 0;

@@ -34,7 +34,7 @@ struct netplay_state
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
-typedef netplay_circular_buffer<netplay_state, 6> netplay_statelist;
+typedef netplay_circular_buffer<netplay_state, 5> netplay_statelist;
 
 struct netplay_stats
 {
@@ -71,6 +71,7 @@ public:
 	netplay_peer* my_peer() const;
 
 private:
+	unsigned int calculate_input_delay();
 	void recalculate_input_delay();
 	void send_sync(bool full_sync);
 

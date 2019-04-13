@@ -83,7 +83,6 @@ struct netplay_sync
 {
 	netplay_frame m_frame_count; // frame count at sync
 	unsigned int m_input_delay;
-	std::vector<std::pair<unsigned char, std::vector<netplay_input>>> m_inputs;
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
@@ -91,17 +90,6 @@ struct netplay_sync
 		writer.header('S', 'Y', 'N', 'C');
 		writer.write(m_frame_count);
 		writer.write(m_input_delay);
-
-		writer.write((unsigned int)m_inputs.size());
-
-		for (auto& pair : m_inputs)
-		{
-			writer.write(pair.first);
-			writer.write((unsigned int)pair.second.size());
-
-			for (auto& input : pair.second)
-				input.serialize(writer);
-		}
 	}
 
 	template <typename StreamReader>
@@ -110,28 +98,6 @@ struct netplay_sync
 		reader.header('S', 'Y', 'N', 'C');
 		reader.read(m_frame_count);
 		reader.read(m_input_delay);
-
-		unsigned int num_peers;
-		reader.read(num_peers);
-
-		m_inputs.resize(num_peers);
-
-		unsigned char peerid;
-		unsigned int num_inputs;
-
-		for (auto i = 0u; i < num_peers; i++)
-		{
-			reader.read(peerid);
-			reader.read(num_inputs);
-
-			std::vector<netplay_input> inputs;
-			inputs.resize(num_inputs);
-
-			for (auto q = 0u; q < num_inputs; q++)
-				inputs[q].deserialize(reader);
-
-			m_inputs[i] = std::make_pair(peerid, std::move(inputs));
-		}
 	}
 };
 
