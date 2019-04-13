@@ -88,8 +88,6 @@ private:
 	netplay_peer& add_peer(unsigned char peerid, const netplay_addr& address, bool self = false);
 	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
 	netplay_peer* get_peer_by_peerid(unsigned char peerid) const;
-	bool peer_inputs_available() const;
-	bool wait_for_peer_inputs();
 	bool wait_for_connection();
 	void set_input_delay(unsigned int input_delay);
 	void send_checksums();

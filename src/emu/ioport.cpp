@@ -2121,14 +2121,14 @@ g_profiler.start(PROFILER_INPUT);
 		// when the actual inputs arrive they'll trigger a rollback in case we predicted wrong
 		for (auto& peer : netplay.peers())
 		{
-			if (peer->m_next_inputs_at > netplay.m_frame_count)
-				continue;
-
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr)
 			{
-				if (netplay.m_catching_up)
+				if (peer->m_next_inputs_at > netplay.m_frame_count)
+				{
+				}
+				else if (netplay.m_catching_up)
 				{
 					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
 					if (!peer->self())
@@ -2141,14 +2141,14 @@ g_profiler.start(PROFILER_INPUT);
 						NETPLAY_LOG("predicting inputs for %d", netplay.m_frame_count);
 				}
 			}
-			else if (!peer->self())
+			else if (inputs != nullptr && !peer->self())
 			{
 				NETPLAY_LOG("applying known inputs for %d", netplay.m_frame_count);
 			}
 
 			if (inputs == nullptr || inputs->m_ports.empty())
 			{
-				NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
+				// NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
 				continue;
 			}
 

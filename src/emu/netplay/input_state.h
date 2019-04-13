@@ -45,10 +45,8 @@ struct netplay_input_port
 			return false;
 
 		for (auto i = 0; i < m_analog_ports.size(); i++)
-		{
 			if (m_analog_ports[i] != port.m_analog_ports[i])
 				return false;
-		}
 
 		return m_digital == port.m_digital;
 	}
@@ -95,10 +93,8 @@ struct netplay_input
 			return false;
 
 		for (auto i = 0; i < m_ports.size(); i++)
-		{
 			if (m_ports[i] != input.m_ports[i])
 				return false;
-		}
 
 		return true;
 	}

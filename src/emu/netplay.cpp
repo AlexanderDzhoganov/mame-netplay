@@ -112,6 +112,23 @@ void netplay_manager::update()
 	auto& next_delay = m_next_input_delay;
 	if (!next_delay.m_processed && next_delay.m_effective_frame == m_frame_count)
 	{
+		static netplay_frame frames = 0;
+
+		if (!can_save())
+		{
+			if (frames++ >= 240)
+			{
+				NETPLAY_LOG("timed out while waiting for inputs, resyncing...");
+				send_sync(false);
+				return;
+			}
+
+			NETPLAY_LOG("have new input delay but not clean yet, waiting...");
+			return;
+		}
+
+		frames = 0;
+
 		set_input_delay(next_delay.m_input_delay);
 		next_delay.m_processed = true;
 	}
@@ -126,7 +143,7 @@ void netplay_manager::update()
 		auto newest_state = get_newest_state();
 		netplay_assert(newest_state != nullptr);
 
-		if (frames_waited++ >= 240)
+		if (m_host && frames_waited++ >= 240)
 		{
 			NETPLAY_LOG("timed out while waiting for inputs, resyncing");
 			send_sync(false);
@@ -812,67 +829,6 @@ netplay_peer* netplay_manager::get_peer_by_peerid(unsigned char peerid) const
 			return peer.get();
 
 	return nullptr;
-}
-
-bool netplay_manager::peer_inputs_available() const
-{
-	if (m_frame_count <= m_max_rollback)
-		return true;
-
-	for(auto& peer : m_peers)
-	{
-		if (peer->self())
-			continue;
-
-		auto target_frame = m_frame_count - m_max_rollback;
-		if (peer->m_next_inputs_at > target_frame)
-			continue;
-
-		auto inputs = peer->inputs_for(target_frame);
-		if (inputs == nullptr)
-		{
-			/*static netplay_frame last_frame = 0;
-			if (last_frame != m_frame_count)
-			{
-				std::stringstream ss;
-				for (auto& pair : peer->m_inputs)
-					ss << pair.first << ", ";
-
-				auto s = ss.str();
-				NETPLAY_LOG("waiting for inputs for %d at %d, have: %s",
-					target_frame, m_frame_count, s.c_str());
-			}
-
-			last_frame = m_frame_count;*/
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool netplay_manager::wait_for_peer_inputs()
-{
-	static netplay_frame consecutive_wait_frames = 0;
-	consecutive_wait_frames++;
-
-	// if we've been waiting more than 240 frames for inputs
-	// send a full sync because something went wrong
-	if (m_host && consecutive_wait_frames >= 240)
-	{
-		send_sync(false);
-		consecutive_wait_frames = 0;
-		return true;
-	}
-
-	if (peer_inputs_available())
-	{
-		consecutive_wait_frames = 0;
-		return false;
-	}
-
-	m_stats.m_waited_for_inputs++;
-	return true;
 }
 
 bool netplay_manager::wait_for_connection()

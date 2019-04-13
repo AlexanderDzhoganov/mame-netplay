@@ -9,12 +9,9 @@ typedef netplay_circular_buffer<float, 200> netplay_latency_samples;
 class netplay_dummy_predictor
 {
 public:
-	bool operator() (const netplay_input_buffer& inputs, netplay_input& predicted, netplay_frame frame_index)
+	void operator() (const netplay_input_buffer& inputs, netplay_input& predicted, netplay_frame frame_index)
 	{
-		if (inputs.empty())
-			return false;
-
-		for (auto i = frame_index; i > 0; i--)
+		for (auto i = frame_index - 1; i > 0; i--)
 		{
 			auto it = inputs.find(i);
 			if (it == inputs.end())
@@ -22,10 +19,8 @@ public:
 
 			predicted = it->second;
 			predicted.m_frame_index = frame_index;
-			return true;
+			return;
 		}
-
-		return false;
 	}
 };
 
@@ -68,12 +63,10 @@ public:
 	netplay_input* predict_input_state(netplay_frame frame_index)
 	{
 		Predictor predictor;
-
-		netplay_input predicted;
-		if(!predictor(m_inputs, predicted, frame_index))
-			return nullptr;
-
-		return &m_predicted_inputs[frame_index];
+		auto& predicted = m_predicted_inputs[frame_index];
+		predicted.m_frame_index = frame_index;
+		predictor(m_inputs, predicted, frame_index);
+		return &predicted;
 	}
 
 	netplay_peer_state state() const { return m_state; }
