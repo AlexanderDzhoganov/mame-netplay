@@ -31,6 +31,10 @@
 
 #define DATA(DATA) do { DATA.serialize(packet); } while(0)
 
+// TODO
+// - fix analog ports
+// - remove checksum code
+
 //-------------------------------------------------
 // netplay_manager
 //-------------------------------------------------
@@ -41,7 +45,6 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	 m_sync_generation(0),
 	 m_frame_count(1),
 	 m_catching_up(false),
-	 m_waiting_for_inputs(false),
 	 m_waiting_for_connection(false),
 	 m_input_delay_backoff(0),
 	 m_next_peerid(1)
@@ -58,7 +61,7 @@ netplay_manager::netplay_manager(running_machine& machine) :
 		m_host_address = netplay_socket::str_to_addr(host_address);
 
 	m_input_delay = 5;                            // use N frames of input delay
-	m_max_rollback = 3;                           // max rollback of N frames
+	m_max_rollback = 8;                           // max rollback of N frames
 	m_input_redundancy = 10;                      // how many frames of inputs to send per packet
 
 	memset(&m_stats, 0, sizeof(netplay_stats));
@@ -100,7 +103,7 @@ void netplay_manager::update()
 {
 	netplay_assert(m_initialized);
 
-	NETPLAY_VERBOSE_LOG("begin frame %d, last = %#08x, memory = %#08x",
+	NETPLAY_VERBOSE_LOG("begin frame %d (last = %#08x, memory = %#08x)",
 		m_frame_count, m_last_state.checksum(), memory_checksum());
 
 	if (wait_for_connection())
@@ -129,6 +132,7 @@ void netplay_manager::update()
 			}
 
 			NETPLAY_VERBOSE_LOG("have new input delay but not clean yet, waiting...");
+			m_stats.m_waited_for_inputs++;
 			return;
 		}
 
@@ -159,7 +163,8 @@ void netplay_manager::update()
 	if (m_host && frames_waited++ >= 240)
 	{
 		NETPLAY_LOG("timed out while waiting for inputs, resyncing");
-		send_sync(false);
+		send_sync(true);
+		frames_waited = 0;
 		return;
 	}
 	else if (m_last_state.m_frame_count + m_max_rollback < m_frame_count)
@@ -173,10 +178,7 @@ void netplay_manager::update()
 	simulate_until(m_frame_count + 1);
 
 	if (m_host)
-	{
-		// recalculate_input_delay();
-		verify_checksums();
-	}
+		recalculate_input_delay();
 
 	// every N frames garbage collect the input buffers
 	auto gc_every = 60;
@@ -188,7 +190,7 @@ void netplay_manager::update()
 		}
 	}
 
-	NETPLAY_VERBOSE_LOG("end frame %d, last = %#08x, memory = %#08x",
+	NETPLAY_VERBOSE_LOG("end frame %d (last = %#08x, memory = %#08x)",
 		m_frame_count, m_last_state.checksum(), memory_checksum());
 
 	static netplay_frame last_stats_frame = 0;
@@ -242,8 +244,7 @@ void netplay_manager::recalculate_input_delay()
 
 	NETPLAY_LOG("setting next input delay to '%d'", input_delay);
 
-	m_input_delay_backoff = 90;
-
+	m_input_delay_backoff = 120;
 	m_next_input_delay.m_processed = false;
 	m_next_input_delay.m_input_delay = input_delay;
 	m_next_input_delay.m_effective_frame = m_frame_count + 60;
@@ -274,9 +275,9 @@ void netplay_manager::store_state()
 		state.m_frame_count, state.checksum());
 
 	// this is necessary or we get desyncs
-	machine().save().dispatch_postload();
+	// machine().save().dispatch_postload();
 
-	if (!m_host)
+	/*if (!m_host)
 	{
 		netplay_checksum checksum;
 		checksum.m_frame_count = state.m_frame_count;
@@ -300,7 +301,7 @@ void netplay_manager::store_state()
 			checksums[i] = state.m_blocks[i]->checksum();
 
 		me->m_checksums[state.m_frame_count] = checksums;
-	}
+	}*/
 }
 
 // load the latest sync point
@@ -382,8 +383,8 @@ void netplay_manager::send_sync(bool full_sync)
 	m_sync_generation++;
 	m_stats.m_syncs++;
 	m_next_input_delay.m_processed = true;
-	m_input_delay_backoff = 31;
-	m_input_delay = 5; // calculate_input_delay();
+	m_input_delay_backoff = 120;
+	m_input_delay = calculate_input_delay();
 
 	load_state(m_last_state);
 	auto& state = m_last_state;
@@ -582,10 +583,7 @@ void netplay_manager::handle_inputs_packet(netplay_socket_reader& reader, netpla
 		auto input_frame = input.m_frame_index;
 		auto it = inputs.find(input_frame);
 		if (it != inputs.end())
-		{
-			netplay_assert(it->second == input);
 			continue;
-		}
 
 		if (input_frame <= m_last_state.m_frame_count)
 			NETPLAY_VERBOSE_LOG("received input for %d but last state is at %d", input_frame, m_last_state.m_frame_count);

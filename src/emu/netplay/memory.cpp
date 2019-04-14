@@ -5,7 +5,6 @@
 #include "netplay/util.h"
 #include "netplay.h"
 #include "netplay/memory.h"
-#include "netplay/module_blacklist.h"
 
 #define CRC32(DATA, LENGTH) util::crc32_creator::simple(DATA, LENGTH).m_raw
 
@@ -68,9 +67,6 @@ void netplay_memory::copy_from(const netplay_memory& block)
 
 unsigned int netplay_memory::checksum()
 {
-	// if (netplay_is_blacklisted(m_module_hash))
-	// return 0;
-
 	m_checksum = CRC32(m_data, m_size);
 	return m_checksum;
 }

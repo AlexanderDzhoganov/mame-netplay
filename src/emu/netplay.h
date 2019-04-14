@@ -62,7 +62,7 @@ public:
 	void update();
 
 	bool initialized() const { return m_initialized; }
-	bool waiting() const { return m_catching_up || m_waiting_for_inputs; }
+	bool catching_up() const { return m_catching_up; }
 	netplay_frame frame_count() const { return m_frame_count; }
 	unsigned int input_delay() const { return m_input_delay; }
 	const netplay_peerlist& peers() const { return m_peers; }
@@ -132,7 +132,6 @@ private:
 	netplay_frame m_frame_count;     // current frame (update) count
 
 	bool m_catching_up;             // are we catching up?
-	bool m_waiting_for_inputs;      // are we waiting for inputs?
 	bool m_waiting_for_connection;
 
 	netplay_stats m_stats;          // various collected stats

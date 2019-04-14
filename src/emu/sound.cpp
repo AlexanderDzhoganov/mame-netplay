@@ -77,13 +77,6 @@ sound_stream::sound_stream(device_t &device, int inputs, int outputs, int sample
 	// create a unique tag for saving
 	std::string state_tag = string_format("%d", m_device.machine().sound().m_stream_list.size());
 	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_sample_rate));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_attoseconds_per_sample));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_max_samples_per_update));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_resample_bufalloc));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_bufalloc));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_sampindex));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_update_sampindex));
-	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_base_sampindex));
 	m_device.machine().save().register_postload(save_prepost_delegate(FUNC(sound_stream::postload), this));
 
 	// save the gain of each input and output
@@ -614,9 +607,6 @@ void sound_stream::allocate_output_buffers()
 
 void sound_stream::postload()
 {
-	if (m_device.machine().netplay_active())
-		return;
-
 	// recompute the same rate information
 	recompute_sample_rate_data();
 
@@ -1105,9 +1095,6 @@ void sound_manager::update(void *ptr, int param)
 	// now downmix the final result
 
 	int speed_factor = machine().video().speed_factor();
-	if (machine().netplay_active())
-		speed_factor = 1000;
-
 	u32 finalmix_step = speed_factor;
 	u32 finalmix_offset = 0;
 	s16 *finalmix = &m_finalmix[0];
@@ -1137,8 +1124,8 @@ void sound_manager::update(void *ptr, int param)
 	// play the result
 	if (finalmix_offset > 0)
 	{
-		auto waiting = machine().netplay_active() && machine().netplay().waiting();
-		if (!m_nosound_mode && !waiting)
+		auto catching_up = machine().netplay_active() && machine().netplay().catching_up();
+		if (!m_nosound_mode && !catching_up)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
 	
 		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
