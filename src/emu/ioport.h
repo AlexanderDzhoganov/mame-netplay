@@ -1376,6 +1376,7 @@ class ioport_manager
 	DISABLE_COPYING(ioport_manager);
 	friend class device_t;
 	friend class ioport_configurer;
+	friend class netplay_manager;
 
 public:
 	// construction/destruction

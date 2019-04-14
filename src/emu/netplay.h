@@ -78,6 +78,7 @@ private:
 	void store_state();
 	void load_state(const netplay_state& state);
 	void rollback();
+	void simulate_until(netplay_frame frame_index);
 
 	void handle_host_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
 	void handle_client_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);

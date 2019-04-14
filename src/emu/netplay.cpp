@@ -156,34 +156,21 @@ void netplay_manager::update()
 	}*/
 
 	static netplay_frame frames_waited = 0;
-	if (can_save())
+	if (m_host && frames_waited++ >= 240)
 	{
-		store_state();
+		NETPLAY_LOG("timed out while waiting for inputs, resyncing");
+		send_sync(false);
+		return;
 	}
-	else
+	else if (m_last_state.m_frame_count + m_max_rollback < m_frame_count)
 	{
-		if (m_host && frames_waited++ >= 240)
-		{
-			NETPLAY_LOG("timed out while waiting for inputs, resyncing");
-			send_sync(false);
-			return;
-		}
-
-		if (m_last_state.m_frame_count + m_max_rollback < m_frame_count)
-		{
-			NETPLAY_VERBOSE_LOG("waiting for inputs...");
-			return;
-		}
+		NETPLAY_VERBOSE_LOG("waiting for inputs...");
+		return;
 	}
 
 	frames_waited = 0;
-
-	auto current_frame = m_frame_count;
-	while (m_frame_count == current_frame)
-	{
-		machine().scheduler().timeslice();
-		NETPLAY_VERBOSE_LOG("(#) after timeslice at %d (memory = %#08x)", m_frame_count, memory_checksum());
-	}
+	
+	simulate_until(m_frame_count + 1);
 
 	if (m_host)
 	{
@@ -354,16 +341,34 @@ void netplay_manager::rollback()
 	m_catching_up = true;
 
 	// run the emulator loop, this will replay any new inputs that we have received since
-	while (m_frame_count != start_frame)
-	{
-		machine().scheduler().timeslice();
-		NETPLAY_VERBOSE_LOG("(!) after timeslice at %d (memory = %#08x)", m_frame_count, memory_checksum());
-	}
+	simulate_until(start_frame);
 
-	NETPLAY_VERBOSE_LOG("(!) rollback finished");
+	NETPLAY_VERBOSE_LOG("(!) rollback finished (memory = %#08x)", memory_checksum());
 
 	m_catching_up = false;
 	m_stats.m_rollbacks++;
+}
+
+void netplay_manager::simulate_until(netplay_frame frame_index)
+{
+	static attotime update_freq = attotime::from_hz(60);
+
+	while (m_frame_count != frame_index)
+	{
+		machine().ioport().frame_update();
+
+		auto target_time = machine().time() + update_freq;
+		while (machine().time() <= target_time)
+			machine().scheduler().timeslice();
+		
+		m_frame_count++;
+	}
+
+	if (!m_catching_up)
+		machine().video().frame_update();
+
+	if (can_save())
+		store_state();
 }
 
 // syncs all clients
@@ -934,7 +939,7 @@ void netplay_manager::verify_checksums()
 	if (!resync)
 		return;
 
-	send_sync(false);
+	// send_sync(false);
 }
 
 bool netplay_manager::can_save()

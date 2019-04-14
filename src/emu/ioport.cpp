@@ -1704,7 +1704,7 @@ time_t ioport_manager::initialize()
 
 	// add an exit callback and a frame callback
 	machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&ioport_manager::exit, this));
-	machine().add_notifier(MACHINE_NOTIFY_FRAME, machine_notify_delegate(&ioport_manager::frame_update_callback, this));
+	// machine().add_notifier(MACHINE_NOTIFY_FRAME, machine_notify_delegate(&ioport_manager::frame_update_callback, this));
 
 	// initialize the default port info from the OSD
 	init_port_types();
@@ -2044,9 +2044,6 @@ g_profiler.start(PROFILER_INPUT);
 	attotime curtime = machine().time();
 	bool netplay_active = machine().netplay_active();
 	bool catching_up = netplay_active && machine().netplay().m_catching_up;
-
-	if (netplay_active)
-		machine().netplay().m_frame_count++;
 
 	// track the duration of the previous frame
 	m_last_delta_nsec = (curtime - m_last_frame_time).as_attoseconds() / ATTOSECONDS_PER_NANOSECOND;

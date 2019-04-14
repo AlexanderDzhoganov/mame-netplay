@@ -175,6 +175,7 @@ private:
 class sound_manager
 {
 	friend class sound_stream;
+	friend class netplay_manager;
 
 	// reasons for muting
 	static constexpr u8 MUTE_REASON_PAUSE = 0x01;
