@@ -33,6 +33,7 @@ struct netplay_analog_port
 struct netplay_input_port
 {
 	unsigned int m_digital;
+	unsigned int m_defvalue; // non-serialized, only for local player
 	std::vector<netplay_analog_port> m_analog_ports;
 
 	netplay_input_port() : m_digital(0) {}
@@ -85,7 +86,6 @@ struct netplay_input
 	std::vector<netplay_input_port> m_ports;
 	
 	netplay_input() : m_frame_index(0) { m_ports.reserve(16); }
-	netplay_input_port& add_input_port(int digital);
 
 	bool operator==(const netplay_input& input) const
 	{

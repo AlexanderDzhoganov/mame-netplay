@@ -24,6 +24,8 @@ struct netplay_state
 	netplay_frame m_frame_count;
 	netplay_blocklist m_blocks;
 
+	netplay_state() : m_frame_count(0) {}
+
 	unsigned int checksum()
 	{
 		unsigned int checksum = 0;
@@ -90,6 +92,7 @@ private:
 	void set_input_delay(unsigned int input_delay);
 	void verify_checksums();
 	bool can_save();
+	unsigned int memory_checksum();
 
 	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
 	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
@@ -114,7 +117,6 @@ private:
 	bool m_host;                    // whether this node is the host
 	std::string m_name;
 	netplay_addr m_host_address;    // the network address of the host
-	size_t m_max_block_size;        // maximum memory block size. blocks larger than this get split up
 	unsigned int m_input_delay;     // how many frames of input delay to use. higher numbers result in less rollbacks
 	unsigned int m_max_rollback;    // maximum number of frames we're allowed to rollback
 	unsigned int m_input_redundancy;

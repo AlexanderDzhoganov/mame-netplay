@@ -14,14 +14,6 @@ netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous
 	return analog_port;
 }
 
-netplay_input_port& netplay_input::add_input_port(int digital)
-{
-	m_ports.emplace_back();
-	auto& input_port = m_ports.back();
-	input_port.m_digital = digital;
-	return input_port;
-}
-
 std::string netplay_input::debug_string() const
 {
 	std::stringstream ss;

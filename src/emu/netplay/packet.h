@@ -129,16 +129,19 @@ struct netplay_delay
 struct netplay_checksum
 {
 	netplay_frame m_frame_count;
-	unsigned int m_checksum;
+	std::vector<unsigned int> m_checksums;
 
-	netplay_checksum() : m_frame_count(0), m_checksum(0) {}
+	netplay_checksum() : m_frame_count(0) {}
 
 	template <typename StreamWriter>
 	void serialize(StreamWriter& writer) const
 	{
 		writer.header('C', 'H', 'E', 'K');
 		writer.write(m_frame_count);
-		writer.write(m_checksum);
+
+		writer.write((unsigned int)m_checksums.size());
+		for (auto& checksum : m_checksums)
+			writer.write(checksum);
 	}
 
 	template <typename StreamReader>
@@ -146,7 +149,13 @@ struct netplay_checksum
 	{
 		reader.header('C', 'H', 'E', 'K');
 		reader.read(m_frame_count);
-		reader.read(m_checksum);
+
+		unsigned int num_checksums;
+		reader.read(num_checksums);
+		m_checksums.resize(num_checksums);
+
+		for (auto i = 0; i < num_checksums; i++)
+			reader.read(m_checksums[i]);
 	}
 };
 
@@ -177,7 +186,6 @@ void netplay_packet_read_blocks(StreamReader& reader, const netplay_blocklist& b
 		netplay_assert(size == block->size());
 
 		reader.read(block->data(), size);
-		block->invalidate_checksum();
 	}
 }
 

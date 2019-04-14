@@ -1699,6 +1699,9 @@ ioport_manager::ioport_manager(running_machine &machine)
 
 time_t ioport_manager::initialize()
 {
+	machine().save().save_item(&machine().root_device(), "ioport_manager", "timers", 0, NAME(m_last_frame_time));
+	machine().save().save_item(&machine().root_device(), "ioport_manager", "timers", 1, NAME(m_last_delta_nsec));
+
 	// add an exit callback and a frame callback
 	machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&ioport_manager::exit, this));
 	machine().add_notifier(MACHINE_NOTIFY_FRAME, machine_notify_delegate(&ioport_manager::frame_update_callback, this));
@@ -2040,30 +2043,35 @@ g_profiler.start(PROFILER_INPUT);
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
 	bool netplay_active = machine().netplay_active();
+	bool catching_up = netplay_active && machine().netplay().m_catching_up;
 
 	if (netplay_active)
 		machine().netplay().m_frame_count++;
-
-	playback_frame(curtime);
-	record_frame(curtime);
 
 	// track the duration of the previous frame
 	m_last_delta_nsec = (curtime - m_last_frame_time).as_attoseconds() / ATTOSECONDS_PER_NANOSECOND;
 	m_last_frame_time = curtime;
 
-	// update the digital joysticks
-	for (digital_joystick &joystick : m_joystick_list)
-		joystick.frame_update();
+  if (!netplay_active || !catching_up)
+	{
+		playback_frame(curtime);
+		record_frame(curtime);
 
-	// compute default values for all the ports
-	// two passes to catch conditionals properly
-	for (auto &port : m_portlist)
-		port.second->update_defvalue(true);
-	for (auto &port : m_portlist)
-		port.second->update_defvalue(false);
+		// update the digital joysticks
+		for (digital_joystick &joystick : m_joystick_list)
+			joystick.frame_update();
+		for (auto& port : m_portlist)
+			port.second->frame_update();
+		// compute default values for all the ports
+		// two passes to catch conditionals properly
+		for (auto &port : m_portlist)
+			port.second->update_defvalue(true);
+		for (auto &port : m_portlist)
+			port.second->update_defvalue(false);
+	}
 
 	netplay_input* net_input = nullptr;
-	if (netplay_active && !machine().netplay().m_catching_up)
+	if (netplay_active && !catching_up)
 	{
 		auto& netplay = machine().netplay();
 		auto peer = netplay.my_peer();
@@ -2081,17 +2089,19 @@ g_profiler.start(PROFILER_INPUT);
 		}
 		else
 		{
-			NETPLAY_LOG("have existing inputs for %d", effective_frame);
+			NETPLAY_VERBOSE_LOG("have existing inputs for %d", effective_frame);
 		}
 	}
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
 	{
-		port.second->frame_update();
-		// handle playback/record
-		playback_port(*port.second.get());
-		record_port(*port.second.get());
+		if (!netplay_active || !catching_up)
+		{
+			// handle playback/record
+			playback_port(*port.second.get());
+			record_port(*port.second.get());
+		}
 
 		if (!netplay_active)
 			continue;
@@ -2100,14 +2110,17 @@ g_profiler.start(PROFILER_INPUT);
 
 		if (net_input != nullptr)
 		{
-			auto& net_port = net_input->add_input_port(live_port.digital);
+			net_input->m_ports.emplace_back();
+			auto& net_port = net_input->m_ports.back();
+			net_port.m_digital = live_port.digital;
+			net_port.m_defvalue = live_port.defvalue;
 
-			for (auto& analog : live_port.analoglist)
-				net_port.add_analog_port(analog.m_accum, analog.m_previous);
+			/*for (auto& analog : live_port.analoglist)
+				net_port.add_analog_port(analog.m_accum, analog.m_previous);*/
 		}
 
 		// clear all inputs so we can overwrite them with the synced ones
-		netplay_clear_ports(live_port);
+		live_port.digital = 0;
 	}
 
 	if (netplay_active)
@@ -2120,39 +2133,34 @@ g_profiler.start(PROFILER_INPUT);
 		{
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
-			if (inputs == nullptr)
+			/*if (inputs == nullptr && !peer->self())
 			{
 				if (peer->m_next_inputs_at > netplay.m_frame_count)
 				{
 				}
 				else if (netplay.m_catching_up)
 				{
-					netplay_assert(!peer->self());
 					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
 					if (!peer->self())
-						NETPLAY_LOG("applying previously predicted inputs on %d", netplay.m_frame_count);
+						NETPLAY_VERBOSE_LOG("applying previously predicted inputs on %d", netplay.m_frame_count);
 				}
 				else
 				{
-					netplay_assert(!peer->self());
 					inputs = peer->predict_input_state<netplay_dummy_predictor>(netplay.m_frame_count);
 					if (!peer->self())
-						NETPLAY_LOG("predicting inputs for %d", netplay.m_frame_count);
+						NETPLAY_VERBOSE_LOG("predicting inputs for %d", netplay.m_frame_count);
 				}
 			}
 			else if (inputs != nullptr && !peer->self())
 			{
-				NETPLAY_LOG("applying known inputs for %d", netplay.m_frame_count);
-			}
+				NETPLAY_VERBOSE_LOG("applying known inputs for %d", netplay.m_frame_count);
+			}*/
 
-			if (inputs == nullptr)
+			if (inputs == nullptr || inputs->m_ports.empty())
 			{
-				NETPLAY_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
+				// NETPLAY_VERBOSE_LOG("missing inputs for peer %d for frame %d", peer->m_peerid, netplay.m_frame_count);
 				continue;
 			}
-
-			if (inputs->m_ports.empty())
-				continue;
 
 			netplay_assert(inputs->m_ports.size() == m_portlist.size());
 
@@ -2160,54 +2168,37 @@ g_profiler.start(PROFILER_INPUT);
 			auto port_index = 0u;
 			for (auto &port : m_portlist)
 			{
-				auto& input_port = inputs->m_ports[port_index++];
-				netplay_update_ports(port.second->live(), input_port);
+				auto& net_port = inputs->m_ports[port_index++];
+				auto& live_port = port.second->live();
+
+				live_port.digital |= net_port.m_digital;
+				if (peer->self())
+					live_port.defvalue = net_port.m_defvalue;
 			}
 		}
 
 		// finally submit my input state for sending
-		if (net_input != nullptr)
-			netplay.send_input_state(net_input->m_frame_index);
+		// if (net_input != nullptr)
+		//	netplay.send_input_state(net_input->m_frame_index);
 	}
+
+	/*unsigned char checksum = 0;
 
 	// loop over all input ports
 	for (auto &port : m_portlist)
 	{
-		// call device line write handlers
+		checksum ^= port.second->live().digital;
 		ioport_value newvalue = port.second->read();
+
+		// call device line write handlers
 		for (dynamic_field &dynfield : port.second->live().writelist)
 			if (dynfield.field().type() != IPT_OUTPUT)
 				dynfield.write(newvalue);
 	}
 
+	NETPLAY_LOG("port checksum at %d = %#08x", machine().netplay().m_frame_count, checksum);*/
+
 g_profiler.stop();
-}
-
-void ioport_manager::netplay_clear_ports(ioport_port_live& live_port)
-{
-  live_port.digital = 0;
-
-  for (auto& analog : live_port.analoglist)
-  {
-    analog.m_accum = 0;
-    analog.m_previous = 0;
-  }
-}
-
-void ioport_manager::netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port)
-{
-	live_port.digital |= net_port.m_digital;
-
-	auto analog_index = 0u;
-	for (auto& analog : live_port.analoglist)
-	{
-		auto& analog_port = net_port.m_analog_ports[analog_index];
-
-		analog.m_accum |= analog_port.m_accum;
-		analog.m_previous |= analog_port.m_previous;
-
-		analog_index++;
-	}
 }
 
 //-------------------------------------------------

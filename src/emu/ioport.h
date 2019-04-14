@@ -1421,10 +1421,6 @@ private:
 	void frame_update_callback();
 	void frame_update();
 
-	// netplay helpers
-	void netplay_clear_ports(ioport_port_live& live_port);
-	void netplay_update_ports(ioport_port_live& live_port, const netplay_input_port& net_port);
-
 	ioport_port *port(const char *tag) const { if (tag) { auto search = m_portlist.find(tag); if (search != m_portlist.end()) return search->second.get(); else return nullptr; } else return nullptr; }
 	void exit();
 	input_seq_type token_to_seq_type(const char *string);

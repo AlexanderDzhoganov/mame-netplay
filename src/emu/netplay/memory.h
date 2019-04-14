@@ -20,7 +20,6 @@ public:
 	size_t size() const { return m_size; }
 	bool owns_memory() const { return m_owns_memory; }
 	unsigned int checksum();
-	void invalidate_checksum() { m_has_checksum = false; }
 	std::string debug_string();
 
 private:
@@ -31,7 +30,6 @@ private:
 	std::string m_name;
 	char* m_data;
 	bool m_owns_memory;
-	bool m_has_checksum;
 	unsigned int m_checksum;
 };
 
