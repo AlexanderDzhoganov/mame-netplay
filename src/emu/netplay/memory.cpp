@@ -69,7 +69,7 @@ void netplay_memory::copy_from(const netplay_memory& block)
 unsigned int netplay_memory::checksum()
 {
 	// if (netplay_is_blacklisted(m_module_hash))
- 	//	return 0;
+	// return 0;
 
 	m_checksum = CRC32(m_data, m_size);
 	return m_checksum;

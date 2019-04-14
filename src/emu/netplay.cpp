@@ -138,7 +138,7 @@ void netplay_manager::update()
 		next_delay.m_processed = true;
 	}
 
-	if (m_frame_count % 10 == 0)
+	/*if (m_frame_count % 10 == 0)
 	{
 		store_state();
 	}
@@ -153,9 +153,9 @@ void netplay_manager::update()
 		for (auto i = 0; i < m_memory.size(); i++)
 			if (m_memory[i]->checksum() != checksums[i])
 				NETPLAY_LOG("(!!) checksum mismatch at %d in block %s", m_frame_count, m_memory[i]->module_name().c_str());
-	}
+	}*/
 
-	/*static netplay_frame frames_waited = 0;
+	static netplay_frame frames_waited = 0;
 	if (can_save())
 	{
 		store_state();
@@ -174,12 +174,9 @@ void netplay_manager::update()
 			NETPLAY_VERBOSE_LOG("waiting for inputs...");
 			return;
 		}
-
-		// tell devices to save their memory
-		machine().save().dispatch_presave();
 	}
 
-	frames_waited = 0;*/
+	frames_waited = 0;
 
 	auto current_frame = m_frame_count;
 	while (m_frame_count == current_frame)

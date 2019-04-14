@@ -85,8 +85,8 @@ netplay_status netplay_socket::send(netplay_memory_stream& stream, const netplay
     return NETPLAY_LZMA_ERROR;
   }
 
-  if (compressed_size > 1024)
-    NETPLAY_LOG("sending %lukb packet", compressed_size / 1024);
+  // if (compressed_size > 1024)
+  //  NETPLAY_LOG("sending %lukb packet", compressed_size / 1024);
   
   EM_ASM_ARGS({
       jsmame_netplay_packet($0, $1, $2, $3);

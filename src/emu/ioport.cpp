@@ -1700,7 +1700,7 @@ ioport_manager::ioport_manager(running_machine &machine)
 time_t ioport_manager::initialize()
 {
 	machine().save().save_item(&machine().root_device(), "ioport_manager", "timers", 0, NAME(m_last_frame_time));
-	machine().save().save_item(&machine().root_device(), "ioport_manager", "timers", 1, NAME(m_last_delta_nsec));
+	machine().save().save_item(&machine().root_device(), "ioport_manager", "timers", 0, NAME(m_last_delta_nsec));
 
 	// add an exit callback and a frame callback
 	machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&ioport_manager::exit, this));
@@ -2133,7 +2133,7 @@ g_profiler.start(PROFILER_INPUT);
 		{
 			// fetch this peer's inputs
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
-			/*if (inputs == nullptr && !peer->self())
+			if (inputs == nullptr && !peer->self())
 			{
 				if (peer->m_next_inputs_at > netplay.m_frame_count)
 				{
@@ -2154,7 +2154,7 @@ g_profiler.start(PROFILER_INPUT);
 			else if (inputs != nullptr && !peer->self())
 			{
 				NETPLAY_VERBOSE_LOG("applying known inputs for %d", netplay.m_frame_count);
-			}*/
+			}
 
 			if (inputs == nullptr || inputs->m_ports.empty())
 			{
@@ -2178,8 +2178,8 @@ g_profiler.start(PROFILER_INPUT);
 		}
 
 		// finally submit my input state for sending
-		// if (net_input != nullptr)
-		//	netplay.send_input_state(net_input->m_frame_index);
+		if (net_input != nullptr)
+			netplay.send_input_state(net_input->m_frame_index);
 	}
 
 	/*unsigned char checksum = 0;

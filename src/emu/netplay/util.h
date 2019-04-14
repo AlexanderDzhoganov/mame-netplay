@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define NETPLAY_DEBUG
+// #define NETPLAY_DEBUG
 
 #define NETPLAY_LOG(...) { printf(__VA_ARGS__); printf("\n"); }
 

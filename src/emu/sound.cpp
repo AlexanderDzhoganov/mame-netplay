@@ -77,6 +77,13 @@ sound_stream::sound_stream(device_t &device, int inputs, int outputs, int sample
 	// create a unique tag for saving
 	std::string state_tag = string_format("%d", m_device.machine().sound().m_stream_list.size());
 	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_sample_rate));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_attoseconds_per_sample));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_max_samples_per_update));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_resample_bufalloc));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_bufalloc));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_sampindex));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_update_sampindex));
+	m_device.machine().save().save_item(&m_device, "stream", state_tag.c_str(), 0, NAME(m_output_base_sampindex));
 	m_device.machine().save().register_postload(save_prepost_delegate(FUNC(sound_stream::postload), this));
 
 	// save the gain of each input and output
@@ -607,6 +614,9 @@ void sound_stream::allocate_output_buffers()
 
 void sound_stream::postload()
 {
+	if (m_device.machine().netplay_active())
+		return;
+
 	// recompute the same rate information
 	recompute_sample_rate_data();
 
