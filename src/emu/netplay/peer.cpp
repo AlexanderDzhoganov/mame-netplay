@@ -92,7 +92,7 @@ void netplay_peer::gc_buffer(netplay_frame before_frame, netplay_input_buffer& b
 			continue;
 
 		if (warn)
-			NETPLAY_LOG("dangling predicted inputs for frame %d", it->first);
+			NETPLAY_VERBOSE_LOG("dangling predicted inputs for frame %d", it->first);
 
 		it = buffer.erase(it);
 		if (it == buffer.end())

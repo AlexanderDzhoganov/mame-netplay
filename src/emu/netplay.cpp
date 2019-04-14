@@ -5,6 +5,7 @@
 
 #include "emu.h"
 #include "emuopts.h"
+#include "screen.h"
 #include "ui/uimain.h"
 
 #include <emscripten.h>
@@ -142,11 +143,7 @@ void netplay_manager::update()
 		next_delay.m_processed = true;
 	}
 
-	/*if (m_frame_count % 10 == 0)
-	{
-		store_state();
-	}
-	else if (m_frame_count % 10 == 5)
+	/*if (m_frame_count > 1000 && m_frame_count % 100 == 1)
 	{
 		std::vector<unsigned int> checksums;
 		for (auto i = 0; i < m_memory.size(); i++)
@@ -178,10 +175,13 @@ void netplay_manager::update()
 	simulate_until(m_frame_count + 1);
 
 	if (m_host)
+	{
 		recalculate_input_delay();
+		verify_checksums();
+	}
 
 	// every N frames garbage collect the input buffers
-	auto gc_every = 60;
+	auto gc_every = 30;
 	if (m_frame_count % gc_every && m_frame_count > gc_every)
 	{
 		for (auto& peer : m_peers)
@@ -277,7 +277,7 @@ void netplay_manager::store_state()
 	// this is necessary or we get desyncs
 	// machine().save().dispatch_postload();
 
-	/*if (!m_host)
+	if (!m_host)
 	{
 		netplay_checksum checksum;
 		checksum.m_frame_count = state.m_frame_count;
@@ -301,7 +301,7 @@ void netplay_manager::store_state()
 			checksums[i] = state.m_blocks[i]->checksum();
 
 		me->m_checksums[state.m_frame_count] = checksums;
-	}*/
+	}
 }
 
 // load the latest sync point
@@ -352,20 +352,27 @@ void netplay_manager::rollback()
 
 void netplay_manager::simulate_until(netplay_frame frame_index)
 {
-	static attotime update_freq = attotime::from_hz(60);
+	screen_device* screen = screen_device_iterator(machine().root_device()).first();
+	netplay_assert(screen != nullptr);
+
+	if (m_catching_up)
+		machine().sound().system_mute(true);
 
 	while (m_frame_count != frame_index)
 	{
 		machine().ioport().frame_update();
+		machine().sound().update();
 
-		auto target_time = machine().time() + update_freq;
-		while (machine().time() <= target_time)
+		auto current_frame = screen->frame_number();
+		while (screen->frame_number() == current_frame)
 			machine().scheduler().timeslice();
 		
 		m_frame_count++;
 	}
 
-	if (!m_catching_up)
+	if (m_catching_up)
+		machine().sound().system_mute(false);
+	else
 		machine().video().frame_update();
 
 	if (can_save())

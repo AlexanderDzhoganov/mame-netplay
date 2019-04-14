@@ -39,10 +39,10 @@ public:
 	}
 	virtual void set_mastervolume(int attenuation)
 	{
-		EM_ASM_ARGS({
+		/*EM_ASM_ARGS({
 		// Forward volume update on to JS backend implementation.
 		jsmame_set_mastervolume($0);
-		}, attenuation);
+		}, attenuation);*/
 	}
 
 };

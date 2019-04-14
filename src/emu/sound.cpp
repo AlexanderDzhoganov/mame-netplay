@@ -878,8 +878,8 @@ sound_manager::sound_manager(running_machine &machine)
 	set_attenuation(machine.options().volume());
 
 	// start the periodic update flushing timer
-	m_update_timer = machine.scheduler().timer_alloc(timer_expired_delegate(FUNC(sound_manager::update), this));
-	m_update_timer->adjust(STREAMS_UPDATE_ATTOTIME, 0, STREAMS_UPDATE_ATTOTIME);
+	// m_update_timer = machine.scheduler().timer_alloc(timer_expired_delegate(FUNC(sound_manager::update), this));
+	// m_update_timer->adjust(STREAMS_UPDATE_ATTOTIME, 0, STREAMS_UPDATE_ATTOTIME);
 }
 
 
@@ -1124,10 +1124,8 @@ void sound_manager::update(void *ptr, int param)
 	// play the result
 	if (finalmix_offset > 0)
 	{
-		auto catching_up = machine().netplay_active() && machine().netplay().catching_up();
-		if (!m_nosound_mode && !catching_up)
+		if (!m_nosound_mode)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
-	
 		machine().osd().add_audio_to_recording(finalmix, finalmix_offset / 2);
 		machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
 
