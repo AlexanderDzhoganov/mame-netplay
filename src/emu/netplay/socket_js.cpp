@@ -106,7 +106,7 @@ netplay_status netplay_socket::broadcast(netplay_memory_stream& stream, bool rel
     NETPLAY_LOG("lzma compression error");
     return NETPLAY_LZMA_ERROR;
   }
-  
+
   EM_ASM_ARGS({
       jsmame_netplay_broadcast($0, $1, $2);
     },

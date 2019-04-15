@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 
+#include "emu.h"
 #include "util/hash.h"
 #include "netplay/util.h"
 #include "netplay.h"
@@ -17,6 +18,7 @@ netplay_memory::netplay_memory
 	unsigned int index,
 	const std::string& module_name,
 	const std::string& name,
+	device_t* device,
 	size_t size
 ) :
 	m_size(size),
@@ -24,6 +26,7 @@ netplay_memory::netplay_memory
 	m_module_hash(CRC32(module_name.c_str(), module_name.length())),
 	m_module_name(name),
 	m_name(name),
+	m_device(device),
 	m_data(nullptr),
 	m_owns_memory(true)
 {
@@ -36,6 +39,7 @@ netplay_memory::netplay_memory
 	unsigned int index,
 	const std::string& module_name,
 	const std::string& name,
+	device_t* device,
 	void* data,
 	size_t size
 ) :
@@ -44,6 +48,7 @@ netplay_memory::netplay_memory
 	m_module_hash(CRC32(module_name.c_str(), module_name.length())),
 	m_module_name(name),
 	m_name(name),
+	m_device(device),
 	m_data((char*)data),
 	m_owns_memory(false)
 {

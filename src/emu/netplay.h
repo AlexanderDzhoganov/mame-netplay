@@ -33,6 +33,24 @@ struct netplay_state
 			checksum ^= block->checksum();
 		return checksum;
 	}
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.write(m_frame_count);
+
+		for (auto& block : m_blocks)
+			block->serialize(writer);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.read(m_frame_count);
+
+		for (auto& block : m_blocks)
+			block->deserialize(reader);
+	}
 };
 
 typedef std::vector<std::shared_ptr<netplay_peer>> netplay_peerlist;
@@ -56,7 +74,11 @@ class netplay_manager
 	friend class netplay_socket;
 
 public:
+	static netplay_manager* m_instance;
+	static netplay_manager* instance() { return m_instance; }
+
 	netplay_manager(running_machine& machine);
+	~netplay_manager();
 
 	bool initialize();
 	void update();
@@ -70,6 +92,8 @@ public:
 	attotime system_time() const;
 	netplay_peer* my_peer() const;
 
+	void save_game();
+	void load_game(uintptr_t bytes_ptr, int size);
 private:
 	unsigned int calculate_input_delay();
 	void recalculate_input_delay();
@@ -95,7 +119,7 @@ private:
 	bool can_save();
 	unsigned int memory_checksum();
 
-	void create_memory_block(const std::string& module_name, const std::string& name, void* data_ptr, size_t size);
+	void create_memory_block(state_entry& entry);
 	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
 	bool read_packet_header(netplay_socket_reader& reader, unsigned char& flags, netplay_peer& sender);
 
@@ -124,11 +148,11 @@ private:
 	netplay_peerlist m_peers;       // connected peers
 
 	netplay_blocklist m_memory;     // memory blocks in-use by the emulator
-	netplay_state m_last_state;     // last stored state
-	netplay_state m_good_state;     // last known good state acknowledged between all peers
+	netplay_state m_checkpoint;     // last stored state
+	netplay_state m_snapshot;       // last known good state acknowledged between all peers
 
 	unsigned int m_sync_generation; // we increment this every time we do a sync
-	netplay_frame m_frame_count;     // current frame (update) count
+	netplay_frame m_frame_count;    // current frame (update) count
 
 	bool m_catching_up;             // are we catching up?
 	bool m_waiting_for_connection;

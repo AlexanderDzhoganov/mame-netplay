@@ -145,6 +145,7 @@ end
 		if os.getenv("EMSCRIPTEN") then
 			local emccopts = ""
 				.. " -O" .. _OPTIONS["OPTIMIZE"]
+				.. " --bind"
 				.. " -s USE_PTHREADS=0"
 				.. " -s USE_SDL=2"
 				.. " -s USE_SDL_TTF=2"
