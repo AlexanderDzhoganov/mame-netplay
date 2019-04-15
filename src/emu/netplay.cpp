@@ -32,10 +32,6 @@
 
 #define DATA(DATA) do { DATA.serialize(packet); } while(0)
 
-// TODO
-// - fix analog ports
-// - remove checksum code
-
 //-------------------------------------------------
 // netplay_manager
 //-------------------------------------------------
@@ -48,7 +44,8 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	 m_catching_up(false),
 	 m_waiting_for_connection(false),
 	 m_input_delay_backoff(0),
-	 m_next_peerid(1)
+	 m_next_peerid(1),
+	 m_host_time(0, 0)
 {
 	auto& opts = m_machine.options();
 	auto host_address = opts.netplay_host();
@@ -63,7 +60,6 @@ netplay_manager::netplay_manager(running_machine& machine) :
 
 	m_input_delay = 5;                            // use N frames of input delay
 	m_max_rollback = 8;                           // max rollback of N frames
-	m_input_redundancy = 10;                      // how many frames of inputs to send per packet
 
 	memset(&m_stats, 0, sizeof(netplay_stats));
 }
@@ -177,7 +173,7 @@ void netplay_manager::update()
 	if (m_host)
 	{
 		recalculate_input_delay();
-		verify_checksums();
+		// verify_checksums();
 	}
 
 	// every N frames garbage collect the input buffers
@@ -274,10 +270,7 @@ void netplay_manager::store_state()
 	NETPLAY_VERBOSE_LOG(">> storing state at %d, checksum = %#08x",
 		state.m_frame_count, state.checksum());
 
-	// this is necessary or we get desyncs
-	// machine().save().dispatch_postload();
-
-	if (!m_host)
+	/*if (!m_host)
 	{
 		netplay_checksum checksum;
 		checksum.m_frame_count = state.m_frame_count;
@@ -301,7 +294,7 @@ void netplay_manager::store_state()
 			checksums[i] = state.m_blocks[i]->checksum();
 
 		me->m_checksums[state.m_frame_count] = checksums;
-	}
+	}*/
 }
 
 // load the latest sync point
@@ -459,7 +452,7 @@ void netplay_manager::handle_host_packet(netplay_socket_reader& reader, unsigned
 	}
 	else if (flags & NETPLAY_INPUTS)
 	{
-		handle_inputs_packet(reader, peer);
+		handle_inputs(reader, peer);
 	}
 	else if (flags & NETPLAY_CHECKSUM)
 	{
@@ -495,7 +488,7 @@ void netplay_manager::handle_client_packet(netplay_socket_reader& reader, unsign
 	}
 	else if (flags & NETPLAY_INPUTS)
 	{
-		handle_inputs_packet(reader, peer);
+		handle_inputs(reader, peer);
 	}
 	else if (flags & NETPLAY_DELAY)
 	{
@@ -575,28 +568,38 @@ void netplay_manager::handle_sync(const netplay_sync& sync, netplay_socket_reade
 	}
 }
 
-void netplay_manager::handle_inputs_packet(netplay_socket_reader& reader, netplay_peer& peer)
+void netplay_manager::handle_inputs(netplay_socket_reader& reader, netplay_peer& peer)
 {
 	auto& inputs = peer.m_inputs;
 	bool do_rollback = false;
 
+	netplay_frame frame_index;
+	unsigned char mask;
+
+	reader.read(frame_index);
+	reader.read(mask);
+
 	netplay_input input;
-	for (auto i = 0u; i < m_input_redundancy; i++)
+	for (auto i = 0u; i < 8; i++)
 	{
-		input.deserialize(reader);
-		if (input.m_frame_index == 0)
+		if (!(mask & (1 << i)))
 			continue;
 
-		auto input_frame = input.m_frame_index;
+		input.deserialize(reader);
+
+		auto input_frame = frame_index - i;
+		input.m_frame_index = input_frame;
+
 		auto it = inputs.find(input_frame);
 		if (it != inputs.end())
 			continue;
 
+		NETPLAY_VERBOSE_LOG("received inputs from peer %d for %d",peer.m_peerid, input_frame);
 		if (input_frame <= m_last_state.m_frame_count)
-			NETPLAY_VERBOSE_LOG("received input for %d but last state is at %d", input_frame, m_last_state.m_frame_count);
-		
-		NETPLAY_VERBOSE_LOG("received inputs for %d", input_frame);
-		netplay_assert(input_frame >= peer.m_next_inputs_at);
+			NETPLAY_VERBOSE_LOG("input frame = %d predates last state time = %d",
+				input_frame, m_last_state.m_frame_count);
+		if (input_frame >= peer.m_next_inputs_at)
+			NETPLAY_VERBOSE_LOG("input frame >= peer.m_next_inputs_at");
 
 		inputs[input_frame] = input;
 
@@ -701,7 +704,7 @@ bool netplay_manager::client_socket_connected(const netplay_addr& address)
 	}
 
 	// check if we know of this peer
-	auto connected_peer = get_peer_by_addr(address);
+	auto connected_peer = get_peer(address);
 	if (connected_peer == nullptr)
 	{
 		// if we don't know who this is then it's a peer that just connected
@@ -735,7 +738,7 @@ void netplay_manager::socket_disconnected(const netplay_addr& address)
 
 void netplay_manager::socket_data(netplay_socket_reader& reader, const netplay_addr& sender)
 {
-	auto peer = get_peer_by_addr(sender);
+	auto peer = get_peer(sender);
 	if (peer == nullptr)
 		return;
 
@@ -766,30 +769,37 @@ void netplay_manager::send_input_state(netplay_frame frame_index)
 	netplay_assert(me != nullptr);
 	auto& inputs = me->inputs();
 
-	netplay_input dummy;
-	dummy.m_frame_index = 0;
+	packet.write(frame_index);
 
-	// send the last N input states for redundancy
-	for (auto i = 0; i < m_input_redundancy; i++)
+	unsigned char mask = 0;
+	for (auto i = 0; i < 8; i++)
 	{
 		if (i > frame_index)
-		{
-			dummy.serialize(packet);
 			continue;
-		}
+
+		auto it = inputs.find(frame_index - i);
+		if (it != inputs.end())
+			mask |= (1 << i);
+	}
+
+	packet.write(mask);
+
+	// send the last 8 input states for redundancy
+	for (auto i = 0; i < 8; i++)
+	{
+		if (!(mask & (1 << i)))
+			continue;
 
 		auto it = inputs.find(frame_index - i);
 		if (it == inputs.end())
-		{
-			dummy.serialize(packet);
 			continue;
-		}
 
 		it->second.serialize(packet);
 	}
 
 	m_socket->broadcast(packet.stream(), false);
 	m_stats.m_packets_sent += m_peers.size() - 1;
+	// NETPLAY_LOG("input packet size = %zu", packet.stream().cursor());
 }
 
 netplay_peer& netplay_manager::add_peer(unsigned char peerid, const netplay_addr& address, bool self)
@@ -837,7 +847,7 @@ netplay_peer* netplay_manager::my_peer() const
 	return nullptr;
 }
 
-netplay_peer* netplay_manager::get_peer_by_addr(const netplay_addr& address) const
+netplay_peer* netplay_manager::get_peer(const netplay_addr& address) const
 {
 	for(auto& peer : m_peers)
 		if (peer->m_address == address)
@@ -846,7 +856,7 @@ netplay_peer* netplay_manager::get_peer_by_addr(const netplay_addr& address) con
 	return nullptr;
 }
 
-netplay_peer* netplay_manager::get_peer_by_peerid(unsigned char peerid) const
+netplay_peer* netplay_manager::get_peer(unsigned char peerid) const
 {
 	for(auto& peer : m_peers)
 		if (peer->m_peerid == peerid)
@@ -1010,26 +1020,14 @@ void netplay_manager::write_packet_header(netplay_socket_writer& writer, unsigne
 {
 	writer.header('P', 'A', 'K', 'T');
 	writer.write(m_sync_generation);
-	writer.write(flags);
-
-	auto me = my_peer();
-	netplay_assert(me != nullptr);
-	me->m_last_system_time = system_time();
 
 	if (timestamps)
-	{
-		writer.write((unsigned char)m_peers.size());
-		for(auto& peer : m_peers)
-		{
-			writer.write(peer->m_peerid);
-			writer.write(peer->m_last_system_time);
-		}
-	}
-	else
-	{
-		unsigned char zero = 0;
-		writer.write(zero);
-	}
+		flags |= NETPLAY_TIMESTAMP;
+
+	writer.write(flags);
+
+	if (flags & NETPLAY_TIMESTAMP)
+		writer.write(m_host ? system_time() : m_host_time);
 }
 
 bool netplay_manager::read_packet_header(netplay_socket_reader& reader, unsigned char& flags, netplay_peer& sender)
@@ -1043,41 +1041,22 @@ bool netplay_manager::read_packet_header(netplay_socket_reader& reader, unsigned
 
 	reader.read(flags);
 
-	unsigned char num_peers;
-	reader.read(num_peers);
-
-	auto me = my_peer();
-	netplay_assert(me != nullptr);
-	
-	for (auto i = 0; i < num_peers; i++)
+	if (flags & NETPLAY_TIMESTAMP)
 	{
-		unsigned char peerid;
-		attotime last_system_time;
-
-		reader.read(peerid);
-		reader.read(last_system_time);
-
-		if (peerid != me->m_peerid)
+		if (m_host)
 		{
-			auto peer = get_peer_by_peerid(peerid);
-			if (peer != nullptr)
-				peer->m_last_system_time = last_system_time;
-			continue;
-		}
+			attotime last_system_time;
+			reader.read(last_system_time);
 
-		// this is my timestamp, calculate the latency to the sender
-		auto latency_ms = (system_time() - last_system_time).as_double() * 1000.0;
-		static float sum = 0.0f;
-
-		if (m_frame_count % 5 == 0)
-		{
-			// add half the round-trip latency to this peer's stats
-			sender.latency_estimator().add_sample((sum / 5.0f) * 0.5f);
-			sum = 0.0f;
+			if (last_system_time.seconds() != 0)
+			{
+				auto latency_ms = (system_time() - last_system_time).as_double() * 1000.0;
+				sender.latency_estimator().add_sample(latency_ms * 0.5f);
+			}
 		}
 		else
 		{
-			sum += latency_ms;
+			reader.read(m_host_time);
 		}
 	}
 

@@ -5,15 +5,6 @@
 #include "netplay.h"
 #include "netplay/input_state.h"
 
-netplay_analog_port& netplay_input_port::add_analog_port(int accum, int previous)
-{
-	m_analog_ports.emplace_back();
-	auto& analog_port = m_analog_ports.back();
-	analog_port.m_accum = accum;
-	analog_port.m_previous = previous;
-	return analog_port;
-}
-
 std::string netplay_input::debug_string() const
 {
 	std::stringstream ss;
@@ -27,11 +18,11 @@ std::string netplay_input::debug_string() const
 		auto& port = m_ports[i];
 		ss << "- port #" << i;
 		ss << ", digital = " << port.m_digital << "\n";
-		ss << "- num_analog = " << port.m_analog_ports.size() << "\n";
+		ss << "- num_analog = " << port.m_analog.size() << "\n";
 
-		for (auto q = 0; q < port.m_analog_ports.size(); q++)
+		for (auto q = 0; q < port.m_analog.size(); q++)
 		{
-			auto& analog = port.m_analog_ports[i];
+			auto& analog = port.m_analog[i];
 			ss << "- - analog #" << q << ", accum = " << analog.m_accum;
 			ss << ", prev = " << analog.m_previous << "\n";
 		}

@@ -2112,12 +2112,22 @@ g_profiler.start(PROFILER_INPUT);
 			net_port.m_digital = live_port.digital;
 			net_port.m_defvalue = live_port.defvalue;
 
-			/*for (auto& analog : live_port.analoglist)
-				net_port.add_analog_port(analog.m_accum, analog.m_previous);*/
+			for (auto& analog : live_port.analoglist)
+			{
+				net_port.m_analog.emplace_back();
+				auto& net_analog = net_port.m_analog.back();
+				net_analog.m_accum = analog.m_accum;
+				net_analog.m_previous = analog.m_previous;
+			}
 		}
 
 		// clear all inputs so we can overwrite them with the synced ones
 		live_port.digital = 0;
+		for (auto& analog : live_port.analoglist)
+		{
+			analog.m_accum = 0;
+			analog.m_previous = 0;
+		}
 	}
 
 	if (netplay_active)
@@ -2163,12 +2173,23 @@ g_profiler.start(PROFILER_INPUT);
 
 			// merge the inputs with the emulator ones
 			auto port_index = 0u;
-			for (auto &port : m_portlist)
+			for (auto& port : m_portlist)
 			{
 				auto& net_port = inputs->m_ports[port_index++];
 				auto& live_port = port.second->live();
 
 				live_port.digital |= net_port.m_digital;
+
+				netplay_assert(net_port.m_analog.size() == live_port.analoglist.count());
+
+				auto analog_index = 0u;
+				for(auto& analog : live_port.analoglist)
+				{
+					auto& net_analog = net_port.m_analog[analog_index++];
+					analog.m_accum |= net_analog.m_accum;
+					analog.m_previous |= net_analog.m_previous;
+				}
+
 				if (peer->self())
 					live_port.defvalue = net_port.m_defvalue;
 			}
@@ -2179,12 +2200,9 @@ g_profiler.start(PROFILER_INPUT);
 			netplay.send_input_state(net_input->m_frame_index);
 	}
 
-	/*unsigned char checksum = 0;
-
 	// loop over all input ports
 	for (auto &port : m_portlist)
 	{
-		checksum ^= port.second->live().digital;
 		ioport_value newvalue = port.second->read();
 
 		// call device line write handlers
@@ -2192,9 +2210,6 @@ g_profiler.start(PROFILER_INPUT);
 			if (dynfield.field().type() != IPT_OUTPUT)
 				dynfield.write(newvalue);
 	}
-
-	NETPLAY_LOG("port checksum at %d = %#08x", machine().netplay().m_frame_count, checksum);*/
-
 g_profiler.stop();
 }
 

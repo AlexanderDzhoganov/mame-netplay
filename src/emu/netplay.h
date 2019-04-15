@@ -84,11 +84,11 @@ private:
 	void handle_client_packet(netplay_socket_reader& reader, unsigned char flags, netplay_peer& peer);
 	void handle_handshake(const netplay_handshake& handshake, netplay_peer& peer);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
-	void handle_inputs_packet(netplay_socket_reader& reader, netplay_peer& peer);
+	void handle_inputs(netplay_socket_reader& reader, netplay_peer& peer);
 
 	netplay_peer& add_peer(unsigned char peerid, const netplay_addr& address, bool self = false);
-	netplay_peer* get_peer_by_addr(const netplay_addr& address) const;
-	netplay_peer* get_peer_by_peerid(unsigned char peerid) const;
+	netplay_peer* get_peer(const netplay_addr& address) const;
+	netplay_peer* get_peer(unsigned char peerid) const;
 	bool wait_for_connection();
 	void set_input_delay(unsigned int input_delay);
 	void verify_checksums();
@@ -120,7 +120,6 @@ private:
 	netplay_addr m_host_address;    // the network address of the host
 	unsigned int m_input_delay;     // how many frames of input delay to use. higher numbers result in less rollbacks
 	unsigned int m_max_rollback;    // maximum number of frames we're allowed to rollback
-	unsigned int m_input_redundancy;
 
 	netplay_peerlist m_peers;       // connected peers
 
@@ -138,6 +137,8 @@ private:
 	netplay_delay m_next_input_delay;
 	unsigned int m_input_delay_backoff;
 	unsigned char m_next_peerid;
+
+	attotime m_host_time;
 
 	std::unique_ptr<netplay_socket> m_socket; // network socket implementation
 };

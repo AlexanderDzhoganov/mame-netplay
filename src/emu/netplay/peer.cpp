@@ -16,8 +16,20 @@ netplay_latency_estimator::netplay_latency_estimator() :
 
 void netplay_latency_estimator::add_sample(float latency_ms)
 {
-	latency_ms = std::max(1.0f, std::min(1000.0f, latency_ms));
-	m_history.push_back(latency_ms);
+	static float sum = 0.0f;
+	static unsigned int n = 0;
+
+	if (n < 5)
+	{
+		sum += latency_ms;
+		n++;
+	}
+	else
+	{
+		m_history.push_back(sum / 5.0f);
+		n = 0;
+		sum = 0.0f;
+	}
 }
 
 float netplay_latency_estimator::predicted_latency()
@@ -55,9 +67,8 @@ netplay_peer::netplay_peer(unsigned char peerid, const netplay_addr& address, bo
 	m_peerid(peerid),
 	m_state(NETPLAY_PEER_DISCONNECTED),
 	m_self(self),
-	m_name("peer"),
+	m_name("unknown_peer"),
 	m_address(address),
-	m_last_system_time(0, 0),
 	m_next_inputs_at(0) {}
 
 netplay_input* netplay_peer::inputs_for(netplay_frame frame_index)

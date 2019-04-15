@@ -33,20 +33,19 @@ struct netplay_analog_port
 struct netplay_input_port
 {
 	unsigned int m_digital;
+	std::vector<netplay_analog_port> m_analog;
+
 	unsigned int m_defvalue; // non-serialized, only for local player
-	std::vector<netplay_analog_port> m_analog_ports;
 
-	netplay_input_port() : m_digital(0) {}
-
-	netplay_analog_port& add_analog_port(int accum, int previous);
+	netplay_input_port() : m_digital(0), m_defvalue(0) {}
 
 	bool operator==(const netplay_input_port& port) const
 	{
-		if (m_analog_ports.size() != port.m_analog_ports.size())
+		if (m_analog.size() != port.m_analog.size())
 			return false;
 
-		for (auto i = 0; i < m_analog_ports.size(); i++)
-			if (m_analog_ports[i] != port.m_analog_ports[i])
+		for (auto i = 0; i < m_analog.size(); i++)
+			if (m_analog[i] != port.m_analog[i])
 				return false;
 
 		return m_digital == port.m_digital;
@@ -59,11 +58,17 @@ struct netplay_input_port
 	{
 		writer.write(m_digital);
 
-		netplay_assert(m_analog_ports.size() <= 255);
-		writer.write((unsigned char)m_analog_ports.size());
+		/*netplay_assert(m_analog.size() <= 8);
+		unsigned char mask = 0;
+		for (auto i = 0u; i < m_analog.size(); i++)
+			if (m_analog[i].m_accum != 0 || m_analog[i].m_previous != 0)
+				mask |= (1 << i);
 
-		for(auto& analog_port : m_analog_ports)
-			analog_port.serialize(writer);
+		writer.write(mask);
+
+		for(auto& analog : m_analog)
+			if (analog.m_accum != 0 || analog.m_previous != 0)
+				analog.serialize(writer);*/
 	}
 
 	template <typename StreamReader>
@@ -71,19 +76,26 @@ struct netplay_input_port
 	{
 		reader.read(m_digital);
 
-		unsigned char num_analog_ports;
-		reader.read(num_analog_ports);
-		m_analog_ports.resize(num_analog_ports);
+		/*unsigned char mask;
+		reader.read(mask);
 
-		for(auto& analog_port : m_analog_ports)
-			analog_port.deserialize(reader);
+		unsigned int num_analog = 0;
+		for (auto i = 0u; i < 8; i++)
+			if (mask & (1 << i))
+				num_analog++;
+
+		m_analog.resize(num_analog);
+
+		for (auto i = 0u; i < 8; i++)
+			if (mask & (1 << i))
+				m_analog[i].deserialize(reader);*/
 	}
 };
 
 struct netplay_input
 {
-	netplay_frame m_frame_index; // the frame index to which this input applies
 	std::vector<netplay_input_port> m_ports;
+	netplay_frame m_frame_index; // (non serialized) the frame index to which this input applies
 	
 	netplay_input() : m_frame_index(0) { m_ports.reserve(16); }
 
@@ -105,27 +117,37 @@ struct netplay_input
 	void serialize(StreamWriter& writer) const
 	{
 		writer.header('I', 'N', 'P', 'T');
-		writer.write(m_frame_index);
 		
-		netplay_assert(m_ports.size() <= 255);
-		writer.write((unsigned char)m_ports.size());
+		netplay_assert(m_ports.size() <= 24);
+
+		unsigned int mask = 0;
+		mask |= (unsigned char)m_ports.size();
+
+		for (auto i = 0u; i < m_ports.size(); i++)
+			if (m_ports[i].m_digital != 0)
+				mask |= (1 << (i + 8));
+
+		writer.write(mask);
 
 		for(auto& port : m_ports)
-			port.serialize(writer);
+			if (port.m_digital != 0)
+				port.serialize(writer);
 	}
 
 	template <typename StreamReader>
 	void deserialize(StreamReader& reader)
 	{
 		reader.header('I', 'N', 'P', 'T');
-		reader.read(m_frame_index);
 
-		unsigned char num_ports;
-		reader.read(num_ports);
+		unsigned int mask;
+		reader.read(mask);
+
+		auto num_ports = mask & 0xFF;
 		m_ports.resize(num_ports);
 
-		for(auto& port : m_ports)
-			port.deserialize(reader);
+		for (auto i = 0u; i < 32; i++)
+			if (mask & (1 << (i + 8)))
+				m_ports[i].deserialize(reader);
 	}
 
 	std::string debug_string() const;

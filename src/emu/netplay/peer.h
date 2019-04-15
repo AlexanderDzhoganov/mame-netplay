@@ -4,8 +4,8 @@
 typedef std::unordered_map<netplay_frame, netplay_input> netplay_input_buffer;
 typedef netplay_circular_buffer<float, 200> netplay_latency_samples;
 
-// this is the trivial input predictor
-// it simply repeats the previous frame inputs
+// the trivial input predictor
+// it simply repeats the previous inputs
 class netplay_dummy_predictor
 {
 public:
@@ -76,12 +76,11 @@ public:
 	const netplay_addr& address() const { return m_address; }
 	const netplay_input_buffer& inputs() const { return m_inputs; }
 	const netplay_input_buffer& predicted_inputs() const { return m_predicted_inputs; }
-	bool dirty() const { return !m_predicted_inputs.empty(); }
-	void gc_buffers(netplay_frame before_frame);
-
-	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer, bool warn);
- 
 	netplay_latency_estimator& latency_estimator() { return m_latency_estimator; }
+	bool dirty() const { return !m_predicted_inputs.empty(); }
+
+	void gc_buffers(netplay_frame before_frame);
+	static void gc_buffer(netplay_frame before_frame, netplay_input_buffer& buffer, bool warn);
 
 private:
 	unsigned char m_peerid;
@@ -91,7 +90,6 @@ private:
 	netplay_addr m_address;                  // the peer's network address
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
-	attotime m_last_system_time;             // the last system time we've received from this peer
 	netplay_latency_estimator m_latency_estimator;
 	std::unordered_map<netplay_frame, std::vector<unsigned int>> m_checksums;
 	netplay_frame m_next_inputs_at;
