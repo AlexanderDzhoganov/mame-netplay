@@ -2084,10 +2084,6 @@ g_profiler.start(PROFILER_INPUT);
 			net_input = &(peer->m_inputs[effective_frame]);
 			net_input->m_frame_index = effective_frame;
 		}
-		else
-		{
-			NETPLAY_VERBOSE_LOG("have existing inputs for %d", effective_frame);
-		}
 	}
 
 	// loop over all input ports
@@ -2144,6 +2140,7 @@ g_profiler.start(PROFILER_INPUT);
 			{
 				if (peer->m_next_inputs_at > netplay.m_frame_count)
 				{
+					continue;
 				}
 				else if (netplay.m_catching_up)
 				{
