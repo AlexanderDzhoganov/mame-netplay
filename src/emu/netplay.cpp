@@ -67,8 +67,8 @@ netplay_manager::netplay_manager(running_machine& machine) :
 	if (!m_host)
 		m_host_address = netplay_socket::str_to_addr(host_address);
 
-	m_input_delay = 5;  // use N frames of input delay
-	m_max_rollback = 8; // max rollback of N frames
+	m_input_delay = 5;   // use N frames of input delay
+	m_max_rollback = 14; // max rollback of N frames
 	memset(&m_stats, 0, sizeof(netplay_stats));
 }
 
@@ -981,21 +981,21 @@ unsigned int netplay_manager::num_frames_to_wait()
 bool netplay_manager::should_send_inputs()
 {
 	if (m_peers.size() == 4)
-		return m_frame_count % 4 == 0;
+		return m_frame_count % 6 == 0;
 	else if (m_peers.size() == 3)
-		return m_frame_count % 3 == 0;
+		return m_frame_count % 5 == 0;
 
 	float avg_latency = avg_peer_latency();
-	if (avg_latency < 30.0f)
-		return true;
-
-	if (avg_latency < 70.0f)
+	if (avg_latency < 50.0f)
 		return m_frame_count % 2 == 0;
 
-	if (avg_latency < 200.0f)
+	if (avg_latency < 90.0f)
 		return m_frame_count % 3 == 0;
 
-	return m_frame_count % 4 == 0;
+	if (avg_latency < 150.0f)
+		return m_frame_count % 4 == 0;
+
+	return m_frame_count % 6 == 0;
 }
 
 float netplay_manager::avg_peer_latency()
