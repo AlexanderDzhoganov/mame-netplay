@@ -793,6 +793,7 @@ void netplay_manager::send_input_state(netplay_frame frame_index)
 
 	m_socket->broadcast(packet.stream(), false);
 	m_stats.m_packets_sent += m_peers.size() - 1;
+	// NETPLAY_LOG("input packet size = %zu", packet.stream().cursor());
 }
 
 netplay_peer& netplay_manager::add_peer(unsigned char peerid, const netplay_addr& address, bool self)

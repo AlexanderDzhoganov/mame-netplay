@@ -11,6 +11,21 @@
 #define LZMA_COMPRESSION_LEVEL 9
 
 template <typename T>
+void netplay_stream_writer<T>::write(unsigned int value)
+{
+	unsigned char mask = 0;
+	for (auto i = 0u; i < 4; i++)
+		if ((value >> (i << 3)) & 0xFF)
+			mask |= (1 << i);
+
+	write(mask);
+
+	for (auto i = 0u; i < 4; i++)
+		if ((value >> (i << 3)) & 0xFF)
+			write((unsigned char)((value >> (i << 3)) & 0xFF));
+}
+
+template <typename T>
 void netplay_stream_writer<T>::write(const std::string& value)
 {
 	write((unsigned int)value.length());
@@ -33,6 +48,28 @@ void netplay_stream_reader<T>::header(char a, char b, char c, char d)
 		// maybe we should throw here?
 	}
 #endif
+}
+
+template <typename T>
+void netplay_stream_reader<T>::read(unsigned int& value)
+{
+	value = 0;
+
+	unsigned char mask;
+	read(mask);
+
+	if (mask == 0)
+		return;
+
+	unsigned char byte;
+	for (auto i = 0u; i < 4; i++)
+	{
+		if (mask & (1 << i))
+		{
+			read(byte);
+			value |= ((unsigned int)byte << (i << 3));
+		}
+	}
 }
 
 template <typename T>

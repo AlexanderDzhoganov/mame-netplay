@@ -13,6 +13,7 @@ public:
 	void header(char a, char b, char c, char d) {} // this is a no-op when not compiled in debug mode
 #endif
 
+	void write(unsigned int value);
 	void write(bool value) { write(value ? (char)1 : (char)0); }
 	void write(const std::string& value);
 	void write(const attotime& value) { write((float)value.as_double()); }
@@ -32,6 +33,7 @@ public:
 	netplay_stream_reader(Stream& stream) : m_stream(stream) {}
 
 	void header(char a, char b, char c, char d);
+	void read(unsigned int& value);
 	void read(bool& value) { char c; read(c); value = c == (char)1; }
 	void read(std::string& value);
 	void read(attotime& value) { float d; read(d); value = attotime::from_double(d); }
