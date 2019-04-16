@@ -98,6 +98,7 @@ private:
 	unsigned int calculate_input_delay();
 	void recalculate_input_delay();
 	void send_sync(bool full_sync);
+	void send_ping();
 
 	void store_state();
 	void load_state(const netplay_state& state);
@@ -109,6 +110,7 @@ private:
 	void handle_handshake(const netplay_handshake& handshake, netplay_peer& peer);
 	void handle_sync(const netplay_sync& sync, netplay_socket_reader& reader, netplay_peer& peer);
 	void handle_inputs(netplay_socket_reader& reader, netplay_peer& peer);
+	void handle_ping(netplay_ping& ping, netplay_peer& peer);
 
 	netplay_peer& add_peer(unsigned char peerid, const netplay_addr& address, bool self = false);
 	netplay_peer* get_peer(const netplay_addr& address) const;
@@ -122,7 +124,7 @@ private:
 	float avg_peer_latency();
 
 	void create_memory_block(state_entry& entry);
-	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
+	void write_packet_header(netplay_socket_writer& writer, unsigned char flags);
 	bool read_packet_header(netplay_socket_reader& reader, unsigned char& flags, netplay_peer& sender);
 
 	void print_stats() const;

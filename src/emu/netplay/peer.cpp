@@ -16,20 +16,7 @@ netplay_latency_estimator::netplay_latency_estimator() :
 
 void netplay_latency_estimator::add_sample(float latency_ms)
 {
-	static float sum = 0.0f;
-	static unsigned int n = 0;
-
-	if (n < 5)
-	{
-		sum += latency_ms;
-		n++;
-	}
-	else
-	{
-		m_history.push_back(sum / 5.0f);
-		n = 0;
-		sum = 0.0f;
-	}
+	m_history.push_back(latency_ms);
 }
 
 float netplay_latency_estimator::predicted_latency()

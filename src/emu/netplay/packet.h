@@ -10,8 +10,7 @@ enum netplay_packet_flags
 	NETPLAY_DELAY      = 1 << 3, // new input delay
 	// unreliable
 	NETPLAY_INPUTS     = 1 << 4, // player inputs,
-	// extra
-	NETPLAY_TIMESTAMP  = 1 << 5  // packet contains timestamps in its header
+	NETPLAY_PING       = 1 << 5
 };
 
 struct netplay_handshake
@@ -157,6 +156,30 @@ struct netplay_checksum
 
 		for (auto i = 0; i < num_checksums; i++)
 			reader.read(m_checksums[i]);
+	}
+};
+
+struct netplay_ping
+{
+	bool m_pong;
+	attotime m_system_time;
+
+	netplay_ping() : m_pong(false), m_system_time(0, 0) {}
+
+	template <typename StreamWriter>
+	void serialize(StreamWriter& writer) const
+	{
+		writer.header('P', 'I', 'N', 'G');
+		writer.write(m_pong);
+		writer.write(m_system_time);
+	}
+
+	template <typename StreamReader>
+	void deserialize(StreamReader& reader)
+	{
+		reader.header('P', 'I', 'N', 'G');
+		reader.read(m_pong);
+		reader.read(m_system_time);
 	}
 };
 

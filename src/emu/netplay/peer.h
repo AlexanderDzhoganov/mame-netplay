@@ -2,7 +2,7 @@
 #define MAME_EMU_NETPLAY_PEER_H
 
 typedef std::unordered_map<netplay_frame, netplay_input> netplay_input_buffer;
-typedef netplay_circular_buffer<float, 200> netplay_latency_samples;
+typedef netplay_circular_buffer<float, 100> netplay_latency_samples;
 
 // the trivial input predictor
 // it simply repeats the previous inputs
