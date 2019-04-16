@@ -183,7 +183,7 @@ void netplay_manager::update()
 	//	recalculate_input_delay();
 
 	// every N frames garbage collect the input buffers
-	auto gc_every = 30;
+	auto gc_every = 120;
 	if (m_frame_count % gc_every && m_frame_count > gc_every)
 		for (auto& peer : m_peers)
 			peer->gc_buffers(m_frame_count - gc_every);
@@ -355,6 +355,7 @@ void netplay_manager::simulate_until(netplay_frame frame_index)
 	while (m_frame_count != frame_index)
 	{
 		machine().ioport().frame_update();
+		machine().sound().update();
 
 		auto current_frame = screen->frame_number();
 		while (screen->frame_number() == current_frame)

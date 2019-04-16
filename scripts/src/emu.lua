@@ -266,7 +266,6 @@ files {
 	MAME_DIR .. "src/emu/netplay/socket_js.cpp",
 	MAME_DIR .. "src/emu/netplay/socket.h",
 	MAME_DIR .. "src/emu/netplay/addr.h",
-	MAME_DIR .. "src/emu/netplay/input_state.cpp",
 	MAME_DIR .. "src/emu/netplay/input_state.h",
 	MAME_DIR .. "src/emu/netplay/serialization.cpp",
 	MAME_DIR .. "src/emu/netplay/serialization.h",

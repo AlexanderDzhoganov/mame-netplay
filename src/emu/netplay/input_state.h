@@ -118,14 +118,14 @@ struct netplay_input
 	{
 		writer.header('I', 'N', 'P', 'T');
 		
-		netplay_assert(m_ports.size() <= 24);
+		netplay_assert(m_ports.size() <= 16);
 
-		unsigned int mask = 0;
-		mask |= (unsigned char)m_ports.size();
+		writer.write((unsigned char)m_ports.size());
 
+		unsigned short mask = 0;
 		for (auto i = 0u; i < m_ports.size(); i++)
 			if (m_ports[i].m_digital != 0)
-				mask |= (1 << (i + 8));
+				mask |= (1 << i);
 
 		writer.write(mask);
 
@@ -139,18 +139,19 @@ struct netplay_input
 	{
 		reader.header('I', 'N', 'P', 'T');
 
-		unsigned int mask;
-		reader.read(mask);
+		unsigned char num_ports;
+		reader.read(num_ports);
 
-		auto num_ports = mask & 0xFF;
+		m_ports.clear();
 		m_ports.resize(num_ports);
 
-		for (auto i = 0u; i < 32; i++)
-			if (mask & (1 << (i + 8)))
+		unsigned short mask;
+		reader.read(mask);
+
+		for (auto i = 0u; i < 16; i++)
+			if (mask & (1 << i))
 				m_ports[i].deserialize(reader);
 	}
-
-	std::string debug_string() const;
 };
 
 #endif

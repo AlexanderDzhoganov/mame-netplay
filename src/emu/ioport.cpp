@@ -2108,22 +2108,22 @@ g_profiler.start(PROFILER_INPUT);
 			net_port.m_digital = live_port.digital;
 			net_port.m_defvalue = live_port.defvalue;
 
-			for (auto& analog : live_port.analoglist)
+			/*for (auto& analog : live_port.analoglist)
 			{
 				net_port.m_analog.emplace_back();
 				auto& net_analog = net_port.m_analog.back();
 				net_analog.m_accum = analog.m_accum;
 				net_analog.m_previous = analog.m_previous;
-			}
+			}*/
 		}
 
 		// clear all inputs so we can overwrite them with the synced ones
 		live_port.digital = 0;
-		for (auto& analog : live_port.analoglist)
+		/*for (auto& analog : live_port.analoglist)
 		{
 			analog.m_accum = 0;
 			analog.m_previous = 0;
-		}
+		}*/
 	}
 
 	if (netplay_active)
@@ -2176,7 +2176,7 @@ g_profiler.start(PROFILER_INPUT);
 
 				live_port.digital |= net_port.m_digital;
 
-				netplay_assert(net_port.m_analog.size() == live_port.analoglist.count());
+				/*netplay_assert(net_port.m_analog.size() == live_port.analoglist.count());
 
 				auto analog_index = 0u;
 				for(auto& analog : live_port.analoglist)
@@ -2184,7 +2184,7 @@ g_profiler.start(PROFILER_INPUT);
 					auto& net_analog = net_port.m_analog[analog_index++];
 					analog.m_accum |= net_analog.m_accum;
 					analog.m_previous |= net_analog.m_previous;
-				}
+				}*/
 
 				if (peer->self())
 					live_port.defvalue = net_port.m_defvalue;
