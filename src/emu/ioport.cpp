@@ -2140,7 +2140,6 @@ g_profiler.start(PROFILER_INPUT);
 			{
 				if (peer->m_next_inputs_at > netplay.m_frame_count)
 				{
-					continue;
 				}
 				else if (netplay.m_catching_up)
 				{
@@ -2198,7 +2197,7 @@ g_profiler.start(PROFILER_INPUT);
 	}
 
 	// loop over all input ports
-	for (auto &port : m_portlist)
+	/*for (auto &port : m_portlist)
 	{
 		ioport_value newvalue = port.second->read();
 
@@ -2206,7 +2205,7 @@ g_profiler.start(PROFILER_INPUT);
 		for (dynamic_field &dynfield : port.second->live().writelist)
 			if (dynfield.field().type() != IPT_OUTPUT)
 				dynfield.write(newvalue);
-	}
+	}*/
 g_profiler.stop();
 }
 

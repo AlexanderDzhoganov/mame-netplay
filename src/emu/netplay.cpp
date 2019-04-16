@@ -347,20 +347,20 @@ void netplay_manager::rollback()
 
 void netplay_manager::simulate_until(netplay_frame frame_index)
 {
-	static const attotime update_freq = attotime::from_hz(60);
+	screen_device* screen = screen_device_iterator(machine().root_device()).first();
 
 	if (m_catching_up)
 		machine().sound().system_mute(true);
 
 	while (m_frame_count != frame_index)
 	{
-		m_frame_count++;
 		machine().ioport().frame_update();
-		machine().sound().update();
 
-		auto target_time = machine().time() + update_freq;
-		while (machine().time() < target_time)
+		auto current_frame = screen->frame_number();
+		while (screen->frame_number() == current_frame)
 			machine().scheduler().timeslice();
+
+		m_frame_count++;
 	}
 
 	if (m_catching_up)
@@ -893,27 +893,10 @@ void netplay_manager::set_input_delay(unsigned int input_delay)
 {
 	NETPLAY_LOG("setting input delay to %d at %d", input_delay, m_frame_count);
 
-	auto prev_input_delay = m_input_delay;
+	if (input_delay > m_input_delay)
+		for (auto& peer : m_peers)
+			peer->m_next_inputs_at = m_frame_count + input_delay + 1;
 	m_input_delay = input_delay;
-
-	if (input_delay <= prev_input_delay)
-		return;
-
-	for (auto& peer : m_peers)
-	{
-		peer->m_next_inputs_at = m_frame_count + m_input_delay + 1;
-		
-		auto& inputs = peer->m_inputs;
-		for (auto it = inputs.begin(); it != inputs.end(); ++it)
-		{
-			if (it->first < peer->m_next_inputs_at)
-			{
-				it = inputs.erase(it);
-				if (it == inputs.end())
-					break;
-			}
-		}
-	}
 }
 
 void netplay_manager::verify_checksums()

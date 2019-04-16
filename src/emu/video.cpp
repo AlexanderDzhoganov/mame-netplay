@@ -778,7 +778,7 @@ bool video_manager::is_recording() const
 inline bool video_manager::effective_autoframeskip() const
 {
 	// if we're fast forwarding or paused, autoframeskip is disabled
-	if (m_fastforward || machine().paused() || machine().netplay_active())
+	if (m_fastforward || machine().paused())
 		return false;
 
 	// otherwise, it's up to the user
@@ -794,10 +794,6 @@ inline bool video_manager::effective_autoframeskip() const
 
 inline int video_manager::effective_frameskip() const
 {
-	// no frameskip during netplay
-	if (machine().netplay_active())
-		return 0;
-
 	// if we're fast forwarding, use the maximum frameskip
 	if (m_fastforward)
 		return FRAMESKIP_LEVELS - 1;
@@ -820,7 +816,7 @@ inline bool video_manager::effective_throttle() const
 		return true;
 
 	// if we're fast forwarding, we don't throttle
-	if (m_fastforward || machine().netplay_active())
+	if (m_fastforward)
 		return false;
 
 	// otherwise, it's up to the user
