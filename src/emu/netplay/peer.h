@@ -91,8 +91,6 @@ private:
 	netplay_input_buffer m_inputs;           // peer input buffer
 	netplay_input_buffer m_predicted_inputs; // predicted inputs buffer
 	netplay_latency_estimator m_latency_estimator;
-	std::unordered_map<netplay_frame, std::vector<unsigned int>> m_checksums;
-	netplay_frame m_next_inputs_at;
 };
 
 #endif

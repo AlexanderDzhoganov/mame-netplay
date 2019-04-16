@@ -2079,7 +2079,7 @@ g_profiler.start(PROFILER_INPUT);
 
 		// we only record new inputs if there aren't any existing ones for the target frame
 		// this could happen whenever we switch to a lower input delay
-		if (existing_input == nullptr && peer->m_next_inputs_at <= effective_frame)
+		if (existing_input == nullptr)
 		{
 			net_input = &(peer->m_inputs[effective_frame]);
 			net_input->m_frame_index = effective_frame;
@@ -2138,10 +2138,7 @@ g_profiler.start(PROFILER_INPUT);
 			auto inputs = peer->inputs_for(netplay.m_frame_count);
 			if (inputs == nullptr && !peer->self())
 			{
-				if (peer->m_next_inputs_at > netplay.m_frame_count)
-				{
-				}
-				else if (netplay.m_catching_up)
+				if (netplay.m_catching_up)
 				{
 					inputs = peer->predicted_inputs_for(netplay.m_frame_count);
 					if (!peer->self())

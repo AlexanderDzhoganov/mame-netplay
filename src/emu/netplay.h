@@ -115,9 +115,11 @@ private:
 	netplay_peer* get_peer(unsigned char peerid) const;
 	bool wait_for_connection();
 	void set_input_delay(unsigned int input_delay);
-	void verify_checksums();
 	bool can_save();
 	unsigned int memory_checksum();
+	unsigned int num_frames_to_wait();
+	bool should_send_inputs();
+	float avg_peer_latency();
 
 	void create_memory_block(state_entry& entry);
 	void write_packet_header(netplay_socket_writer& writer, unsigned char flags, bool timestamps = false);
@@ -161,6 +163,8 @@ private:
 	netplay_delay m_next_input_delay;
 	unsigned int m_input_delay_backoff;
 	unsigned char m_next_peerid;
+	bool m_desynced;
+	unsigned int m_sync_cooldown;
 
 	attotime m_host_time;
 

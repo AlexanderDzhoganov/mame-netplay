@@ -97,7 +97,7 @@ struct netplay_input
 	std::vector<netplay_input_port> m_ports;
 	netplay_frame m_frame_index; // (non serialized) the frame index to which this input applies
 	
-	netplay_input() : m_frame_index(0) { m_ports.reserve(16); }
+	netplay_input() : m_frame_index(0) {}
 
 	bool operator==(const netplay_input& input) const
 	{

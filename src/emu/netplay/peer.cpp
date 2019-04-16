@@ -68,8 +68,7 @@ netplay_peer::netplay_peer(unsigned char peerid, const netplay_addr& address, bo
 	m_state(NETPLAY_PEER_DISCONNECTED),
 	m_self(self),
 	m_name("unknown_peer"),
-	m_address(address),
-	m_next_inputs_at(0) {}
+	m_address(address) {}
 
 netplay_input* netplay_peer::inputs_for(netplay_frame frame_index)
 {

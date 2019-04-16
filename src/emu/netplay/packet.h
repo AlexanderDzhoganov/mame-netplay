@@ -8,11 +8,10 @@ enum netplay_packet_flags
 	NETPLAY_READY      = 1 << 1, // client ready
 	NETPLAY_SYNC       = 1 << 2, // sync data
 	NETPLAY_DELAY      = 1 << 3, // new input delay
-	NETPLAY_CHECKSUM   = 1 << 4, // client memory checksum
 	// unreliable
-	NETPLAY_INPUTS     = 1 << 5, // player inputs,
+	NETPLAY_INPUTS     = 1 << 4, // player inputs,
 	// extra
-	NETPLAY_TIMESTAMP  = 1 << 6  // packet contains timestamps in its header
+	NETPLAY_TIMESTAMP  = 1 << 5  // packet contains timestamps in its header
 };
 
 struct netplay_handshake
