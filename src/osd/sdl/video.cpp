@@ -201,8 +201,6 @@ void sdl_osd_interface::extract_video_config()
 	{
 #if (defined SDLMAME_MACOSX || defined SDLMAME_WIN32)
 		stemp = "opengl";
-#elif (defined __STEAMLINK__)
-		stemp = "bgfx";
 #else
 		stemp = "soft";
 #endif
@@ -224,10 +222,6 @@ void sdl_osd_interface::extract_video_config()
 	else if ((strcmp(stemp, SDLOPTVAL_SDL2ACCEL) == 0))
 	{
 		video_config.mode = VIDEO_MODE_SDL2ACCEL;
-	}
-	else if (strcmp(stemp, SDLOPTVAL_BGFX) == 0)
-	{
-		video_config.mode = VIDEO_MODE_BGFX;
 	}
 	else
 	{

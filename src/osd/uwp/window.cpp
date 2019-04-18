@@ -37,7 +37,6 @@
 #include <agile.h>
 using namespace Windows::UI::Core;
 
-#include "modules/render/drawbgfx.h"
 #include "modules/render/drawnone.h"
 
 #define NOT_ALREADY_DOWN(x) (x & 0x40000000) == 0
@@ -138,9 +137,6 @@ bool windows_osd_interface::window_init()
 			case VIDEO_MODE_NONE:
 				error = renderer_none::init(machine());
 				break;
-			case VIDEO_MODE_BGFX:
-				error = renderer_bgfx::init(machine());
-				break;
 			default:
 				fatalerror("Unknown video mode.");
 				break;
@@ -227,9 +223,6 @@ void windows_osd_interface::window_exit()
 	{
 		case VIDEO_MODE_NONE:
 			renderer_none::exit();
-			break;
-		case VIDEO_MODE_BGFX:
-			renderer_bgfx::exit();
 			break;
 		default:
 			break;

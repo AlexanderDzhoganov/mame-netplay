@@ -68,7 +68,7 @@ netplay_manager::netplay_manager(running_machine& machine) :
 		m_host_address = netplay_socket::str_to_addr(host_address);
 
 	m_input_delay = 5;   // use N frames of input delay
-	m_max_rollback = 14; // max rollback of N frames
+	m_max_rollback = 10; // max rollback of N frames
 	memset(&m_stats, 0, sizeof(netplay_stats));
 }
 
@@ -205,7 +205,7 @@ void netplay_manager::update()
 unsigned int netplay_manager::calculate_input_delay()
 {
 	float target_latency = avg_peer_latency();
-	auto input_delay = (int)(target_latency / (1000.0f / 60.0f)) + 1;
+	auto input_delay = (int)(target_latency / (1000.0f / 60.0f)) + 2;
 	return std::min(std::max(input_delay, 0), NETPLAY_INPUT_DELAY_MAX);
 }
 
@@ -986,9 +986,6 @@ bool netplay_manager::should_send_inputs()
 		return m_frame_count % 5 == 0;
 
 	float avg_latency = avg_peer_latency();
-	if (avg_latency < 50.0f)
-		return m_frame_count % 2 == 0;
-
 	if (avg_latency < 90.0f)
 		return m_frame_count % 3 == 0;
 

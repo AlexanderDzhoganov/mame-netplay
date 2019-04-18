@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pty.h>
 
 #if defined(__FreeBSD_kernel__) || defined(__DragonFly__)
 #include <termios.h>

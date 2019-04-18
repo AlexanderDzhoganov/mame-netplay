@@ -149,15 +149,6 @@ const options_entry osd_options::s_option_entries[] =
 	{ OSDOPTION_AUDIO_EFFECT "9",             OSDOPTVAL_NONE,   OPTION_STRING,    "AudioUnit effect 9" },
 #endif
 
-	{ nullptr,                                nullptr,           OPTION_HEADER, "BGFX POST-PROCESSING OPTIONS" },
-	{ OSDOPTION_BGFX_PATH,                    "bgfx",            OPTION_STRING, "path to BGFX-related files" },
-	{ OSDOPTION_BGFX_BACKEND,                 "auto",            OPTION_STRING, "BGFX backend to use (d3d9, d3d11, metal, opengl, gles)" },
-	{ OSDOPTION_BGFX_DEBUG,                   "0",               OPTION_BOOLEAN, "enable BGFX debugging statistics" },
-	{ OSDOPTION_BGFX_SCREEN_CHAINS,           "default",         OPTION_STRING, "comma-delimited list of screen chain JSON names, colon-delimited per-window" },
-	{ OSDOPTION_BGFX_SHADOW_MASK,             "slot-mask.png",   OPTION_STRING, "shadow mask texture name" },
-	{ OSDOPTION_BGFX_LUT,                     "",                OPTION_STRING, "LUT texture name" },
-	{ OSDOPTION_BGFX_AVI_NAME,                OSDOPTVAL_AUTO,    OPTION_STRING, "filename for BGFX output logging" },
-
 		// End of list
 	{ nullptr }
 };
@@ -181,7 +172,6 @@ osd_common_t::osd_common_t(osd_options &options)
 	, m_print_verbose(false)
 	, m_font_module(nullptr)
 	, m_sound(nullptr)
-	, m_debugger(nullptr)
 	, m_midi(nullptr)
 	, m_keyboard_input(nullptr)
 	, m_mouse_input(nullptr)
@@ -214,11 +204,7 @@ void osd_common_t::register_options()
 	REGISTER_MODULE(m_mod_man, FONT_SDL);
 	REGISTER_MODULE(m_mod_man, FONT_NONE);
 
-	REGISTER_MODULE(m_mod_man, SOUND_DSOUND);
-	REGISTER_MODULE(m_mod_man, SOUND_XAUDIO2);
-	REGISTER_MODULE(m_mod_man, SOUND_COREAUDIO);
 	REGISTER_MODULE(m_mod_man, SOUND_JS);
-	REGISTER_MODULE(m_mod_man, SOUND_SDL);
 #ifndef NO_USE_PORTAUDIO
 	REGISTER_MODULE(m_mod_man, SOUND_PORTAUDIO);
 #endif
@@ -230,12 +216,6 @@ void osd_common_t::register_options()
 
 #ifdef SDLMAME_MACOSX
 	REGISTER_MODULE(m_mod_man, DEBUG_OSX);
-#endif
-#ifndef OSD_MINI
-	REGISTER_MODULE(m_mod_man, DEBUG_WINDOWS);
-	REGISTER_MODULE(m_mod_man, DEBUG_QT);
-	REGISTER_MODULE(m_mod_man, DEBUG_IMGUI);
-	REGISTER_MODULE(m_mod_man, DEBUG_NONE);
 #endif
 
 	REGISTER_MODULE(m_mod_man, NETDEV_TAPTUN);
@@ -335,12 +315,6 @@ void osd_common_t::register_options()
 #endif
 
 	// Register debugger options and update options
-	m_mod_man.get_module_names(OSD_DEBUG_PROVIDER, 20, &num, names);
-	dnames.clear();
-	for (int i = 0; i < num; i++)
-		dnames.push_back(names[i]);
-	update_option(OSD_DEBUG_PROVIDER, dnames);
-
 	m_mod_man.get_module_names(OSD_OUTPUT_PROVIDER, 20, &num, names);
 	dnames.clear();
 	for (int i = 0; i < num; i++)
@@ -493,7 +467,6 @@ void osd_common_t::init_debugger()
 	// is active. This gives any OSD debugger interface a chance to
 	// create all of its structures.
 	//
-	m_debugger->init_debugger(machine());
 }
 
 
@@ -510,12 +483,10 @@ void osd_common_t::wait_for_debugger(device_t &device, bool firststop)
 	// called repeatedly until a command is issued that resumes
 	// execution.
 	//
-	m_debugger->wait_for_debugger(device, firststop);
 }
 
 void osd_common_t::debugger_update()
 {
-	if (m_debugger) m_debugger->debugger_update();
 }
 
 
@@ -663,8 +634,6 @@ void osd_common_t::init_subsystems()
 	m_sound = select_module_options<sound_module *>(options(), OSD_SOUND_PROVIDER);
 	m_sound->m_sample_rate = options().sample_rate();
 	m_sound->m_audio_latency = options().audio_latency();
-
-	m_debugger = select_module_options<debug_module *>(options(), OSD_DEBUG_PROVIDER);
 
 	select_module_options<netdev_module *>(options(), OSD_NETDEV_PROVIDER);
 

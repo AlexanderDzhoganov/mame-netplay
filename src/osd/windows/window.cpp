@@ -40,7 +40,6 @@
 using namespace Windows::UI::Core;
 #endif
 
-#include "modules/render/drawbgfx.h"
 #include "modules/render/drawnone.h"
 #include "modules/render/drawd3d.h"
 #include "modules/render/drawgdi.h"
@@ -171,9 +170,6 @@ bool windows_osd_interface::window_init()
 			case VIDEO_MODE_GDI:
 				error = renderer_gdi::init(machine());
 				break;
-			case VIDEO_MODE_BGFX:
-				error = renderer_bgfx::init(machine());
-				break;
 #if (USE_OPENGL)
 			case VIDEO_MODE_OPENGL:
 				renderer_ogl::init(machine());
@@ -277,9 +273,6 @@ void windows_osd_interface::window_exit()
 			break;
 		case VIDEO_MODE_GDI:
 			renderer_gdi::exit();
-			break;
-		case VIDEO_MODE_BGFX:
-			renderer_bgfx::exit();
 			break;
 #if (USE_OPENGL)
 		case VIDEO_MODE_OPENGL:

@@ -139,6 +139,7 @@
 #define NUM_Q256_CARDS          1   // Max of 2
 #define NUM_CHANNEL_CARDS       8
 
+#undef  PAGE_SIZE
 #define PAGE_SIZE               2048
 #define PAGE_COUNT              (65536 / PAGE_SIZE)
 #define PAGE_MASK               (PAGE_SIZE - 1)

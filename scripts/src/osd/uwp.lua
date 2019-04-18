@@ -33,7 +33,6 @@ project ("qtdbg_" .. _OPTIONS["osd"])
 	}
 
 	files {
-		MAME_DIR .. "src/osd/modules/debugger/debugqt.cpp",
 	}
 
 project ("osd_" .. _OPTIONS["osd"])

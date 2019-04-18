@@ -152,9 +152,7 @@ void windows_osd_interface::extract_video_config()
 	// video options: extract the data
 	stemp = options().video();
 	if (strcmp(stemp, "auto") == 0)
-		video_config.mode = VIDEO_MODE_BGFX;
-	else if (strcmp(stemp, "bgfx") == 0)
-		video_config.mode = VIDEO_MODE_BGFX;
+		video_config.mode = VIDEO_MODE_SDL2ACCEL;
 	else if (strcmp(stemp, "none") == 0)
 	{
 		video_config.mode = VIDEO_MODE_NONE;

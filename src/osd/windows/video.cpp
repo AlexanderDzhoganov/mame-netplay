@@ -164,8 +164,6 @@ void windows_osd_interface::extract_video_config()
 		video_config.mode = VIDEO_MODE_D3D;
 	else if (strcmp(stemp, "gdi") == 0)
 		video_config.mode = VIDEO_MODE_GDI;
-	else if (strcmp(stemp, "bgfx") == 0)
-		video_config.mode = VIDEO_MODE_BGFX;
 	else if (strcmp(stemp, "none") == 0)
 	{
 		video_config.mode = VIDEO_MODE_NONE;

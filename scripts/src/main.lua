@@ -87,8 +87,6 @@ end
 		files {
 			MAME_DIR .. "artwork/*",
 			MAME_DIR .. "artwork/**/*",
-			MAME_DIR .. "bgfx/*",
-			MAME_DIR .. "bgfx/**/*",
 			MAME_DIR .. "hash/*",
 			MAME_DIR .. "language/*",
 			MAME_DIR .. "language/**/*",
@@ -297,7 +295,6 @@ end
 		}
 	end
 	links {
-		"bgfx",
 		"bimg",
 		"bx",
 		"ocore_" .. _OPTIONS["osd"],
